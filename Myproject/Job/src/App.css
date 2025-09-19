@@ -1,0 +1,87 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* --- Job Card Styles --- */
+.job-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  padding: 1.5em;
+  margin: 1em 0;
+  background: #fff;
+  transition: box-shadow 0.2s;
+}
+.job-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.job-card button {
+  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: 10px;
+  margin-bottom: 5px;
+  box-shadow: 0 2px 6px rgba(0,123,255,0.08);
+  transition: background 0.2s, transform 0.1s;
+}
+.job-card button:hover {
+  background: linear-gradient(90deg, #0056b3 0%, #007bff 100%);
+  transform: translateY(-2px) scale(1.04);
+}
+.company-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  padding: 1.5em;
+  margin: 1em 0;
+  background: #f9f9f9;
+}
+.dashboard-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2em;
+}
+/* --- End Job Card Styles --- */
