@@ -1,0 +1,30 @@
+{
+  "name": "campus-job-board",
+  "version": "1.0.0",
+  "description": "A complete campus job board application with student and admin dashboards",
+  "scripts": {
+    "start": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd Backend && npm run dev",
+    "frontend": "cd Job && npm run dev",
+    "install-all": "npm install && cd Backend && npm install && cd ../Job && npm install",
+    "build": "cd Job && npm run build",
+    "seed": "cd Backend && npm run seed",
+    "test-backend": "node test-backend.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "campus",
+    "job-board",
+    "placement",
+    "student",
+    "admin",
+    "react",
+    "nodejs",
+    "mongodb"
+  ],
+  "author": "Campus Job Board Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
