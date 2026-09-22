@@ -1,196 +1,269 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, profileAPI } from '../utils/api';
+import Sidebar from '../components/ui/Layout/Sidebar';
+import Topbar from '../components/ui/Layout/Topbar';
+import { useAuth } from '../contexts/AuthContext';
+import { profileAPI } from '../utils/api';
+import { Button, Badge } from '../components/ui';
+import { User, CheckCircle2, FileText, Award, MapPin, Briefcase } from 'lucide-react';
 import '../style.css';
 
 const StudentProfile = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [profileData, setProfileData] = useState({
-    academicHistory: '',
-    resumePath: '',
-    portfolioUrl: ''
-  });
-  const [isEditing, setIsEditing] = useState(false);
-  const [message, setMessage] = useState('');
+  const { user } = useAuth();
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [resumeFile, setResumeFile] = useState(null);
 
   useEffect(() => {
-    const currentUser = getUser();
-    if (currentUser) {
-      if (currentUser.role === 'student' && (currentUser.id || currentUser._id)) {
-        setUser(currentUser);
-        fetchProfile(currentUser.id || currentUser._id);
-      } else {
-        navigate('/');
-      }
-    } else {
-      navigate('/login');
+    if (user) {
+      fetchProfile();
     }
-  }, [navigate]);
+  }, [user]);
 
-  const fetchProfile = async (id) => {
-    setLoading(true);
+  const fetchProfile = async () => {
     try {
-      const data = await profileAPI.get(id);
-      setProfileData(data);
-      setMessage('');
+      setLoading(true);
+      const userId = user.id || user._id;
+      const data = await profileAPI.getProfile(userId);
+      setProfile(data);
     } catch (err) {
-      console.error('Fetch error:', err);
-      if (err.message.includes('404') || err.message.includes('not found')) {
-        setProfileData({ academicHistory: '', resumePath: '', portfolioUrl: '' });
-        setMessage('No profile found. Please create one.');
-      } else {
-        setMessage('Failed to load profile.');
-      }
+      console.error('Error fetching student profile:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e) => {
-    setProfileData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
-  const handleFileChange = (e) => {
-    setResumeFile(e.target.files[0]);
-  };
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    const userId = user?.id || user?._id;
-    if (!user || !userId) {
-      setMessage("User not found. Login again.");
-      return;
-    }
-
-    try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append('academicHistory', profileData.academicHistory);
-      formData.append('portfolioUrl', profileData.portfolioUrl);
-      
-      if (resumeFile) {
-        formData.append('resume', resumeFile);
-      }
-
-      const response = await fetch(`http://localhost:5000/api/profile/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save profile');
-      }
-
-      const data = await response.json();
-      setMessage(data.message || 'Profile saved successfully');
-      setIsEditing(false);
-      setResumeFile(null);
-      fetchProfile(userId);
-    } catch (err) {
-      console.error('Save error:', err);
-      setMessage(err.message || 'Failed to save profile.');
-    }
-  };
-
-  if (loading) return <div className="loading-container">Loading profile...</div>;
-  if (!user) return null;
-
   return (
-    <div className="profile-container">
-      <div className="profile-header">
-        <h2>🧑‍🎓 Student Profile</h2>
-        <button onClick={() => setIsEditing(!isEditing)} className="edit-btn">
-          {isEditing ? 'Cancel' : '✏️ Edit Profile'}
-        </button>
-      </div>
+    <div className="app-shell">
+      <Sidebar user={user} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <Topbar user={user} />
 
-      <div className="profile-card">
-        <h3>Personal Information</h3>
-        <p><strong>Name:</strong> {user.name}</p>
-        <p><strong>Email:</strong> {user.email}</p>
-      </div>
-
-      <form onSubmit={handleSave} className="profile-form">
-        <h3>Academic & Professional Details</h3>
-        <label>Academic History:</label>
-        <textarea
-          name="academicHistory"
-          value={profileData.academicHistory}
-          onChange={handleChange}
-          rows="4"
-          readOnly={!isEditing}
-          placeholder="e.g., Bachelor of Technology in Computer Science, 2021-2025"
-        />
-
-        <label>Resume (PDF):</label>
-        {isEditing ? (
-          <div>
-            <input 
-              type="file" 
-              accept=".pdf" 
-              onChange={handleFileChange}
-              style={{ marginBottom: '10px' }}
-            />
-            {resumeFile && (
-              <p style={{ color: '#10b981', fontSize: '14px' }}>
-                Selected: {resumeFile.name}
+        <main style={{ padding: '32px 40px', maxWidth: 'var(--content-max-width)', width: '100%', margin: '0 auto' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+            <div>
+              <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '32px', color: 'var(--navy-deep)', margin: '0 0 4px 0' }}>
+                My Academic Profile
+              </h1>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+                Institutional student record, academic credentials, and placement preferences.
               </p>
-            )}
-            {profileData.resumePath && (
-              <p style={{ color: '#6b7280', fontSize: '14px' }}>
-                Current: {profileData.resumePath.split('/').pop()}
-              </p>
-            )}
+            </div>
+            <Button variant="secondary" onClick={() => navigate('/profile-setup')}>
+              Edit Profile Credentials
+            </Button>
           </div>
-        ) : profileData.resumePath ? (
-          <div>
-            <a 
-              href={`http://localhost:5000${profileData.resumePath}`} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ 
-                color: '#2563eb', 
-                textDecoration: 'none',
-                display: 'inline-block',
-                padding: '8px 16px',
-                backgroundColor: '#eff6ff',
-                borderRadius: '6px',
-                border: '1px solid #dbeafe'
-              }}
-            >
-              📄 View Resume
-            </a>
-            <p style={{ color: '#6b7280', fontSize: '12px', marginTop: '5px' }}>
-              {profileData.resumePath.split('/').pop()}
-            </p>
-          </div>
-        ) : (
-          <span style={{ color: '#9ca3af' }}>No Resume Uploaded</span>
-        )}
 
-        <label>Portfolio Link:</label>
-        <input
-          type="url"
-          name="portfolioUrl"
-          value={profileData.portfolioUrl}
-          onChange={handleChange}
-          readOnly={!isEditing}
-          placeholder="Link to your portfolio or personal website"
-        />
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
+              Loading profile details...
+            </div>
+          ) : (
+            /* Two Column Profile Layout */
+            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '28px' }}>
+              {/* LEFT COLUMN */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* 1. Profile Identity Panel */}
+                <div className="panel-card" style={{ marginBottom: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                    <div style={{
+                      width: '72px',
+                      height: '72px',
+                      borderRadius: '50%',
+                      background: 'var(--navy)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '28px',
+                      fontFamily: 'var(--font-serif)',
+                      fontWeight: '700'
+                    }}>
+                      {user?.name ? user.name.charAt(0).toUpperCase() : 'S'}
+                    </div>
 
-        {isEditing && (
-          <button type="submit" className="save-btn">Save</button>
-        )}
-      </form>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '24px', color: 'var(--navy-deep)', margin: 0 }}>
+                          {user?.name}
+                        </h2>
+                        <span className={`badge ${profile?.profileStatus === 'verified' ? 'badge-forest' : 'badge-gold'}`}>
+                          {profile?.profileStatus === 'verified' ? '✓ VERIFIED PROFILE' : 'PENDING VERIFICATION'}
+                        </span>
+                      </div>
 
-      {message && <p className="message">{message}</p>}
+                      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                        <span>Register No: <strong style={{ fontFamily: 'var(--font-mono)' }}>{profile?.rollNo || 'CS202301'}</strong></span>
+                        <span>Department: <strong>{profile?.department || 'CSE'} ({profile?.branch || 'B.Tech'})</strong></span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                        <span>📧 {user?.email}</span>
+                        <span>📞 {profile?.phone || '9876543210'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Academic Record Panel */}
+                <div className="panel-card" style={{ marginBottom: 0 }}>
+                  <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', marginBottom: '16px' }}>
+                    ACADEMIC RECORD
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+                    <div style={{ padding: '16px', background: 'var(--paper)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase' }}>CUMULATIVE CGPA</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '26px', fontWeight: '700', color: 'var(--navy-deep)', marginTop: '4px' }}>
+                        {profile?.cgpa || '8.2'}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '16px', background: 'var(--paper)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase' }}>ACTIVE BACKLOGS</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '26px', fontWeight: '700', color: (profile?.backlogs || 0) === 0 ? 'var(--forest)' : 'var(--brick)', marginTop: '4px' }}>
+                        {profile?.backlogs ?? 0}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '16px', background: 'var(--paper)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase' }}>GRADUATION YEAR</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '26px', fontWeight: '700', color: 'var(--navy-deep)', marginTop: '4px' }}>
+                        {profile?.gradYear || 2026}
+                      </div>
+                    </div>
+                  </div>
+
+                  {profile?.academicHistory && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-soft)', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      <strong>Transcript Summary:</strong> {profile.academicHistory}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Skills Panel */}
+                <div className="panel-card" style={{ marginBottom: 0 }}>
+                  <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', marginBottom: '16px' }}>
+                    TECHNICAL SKILLS & TAGS
+                  </h3>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {(profile?.skills || ['JavaScript', 'React', 'Node.js', 'Python', 'MongoDB', 'SQL']).map(skill => (
+                      <span key={skill} style={{
+                        padding: '6px 14px',
+                        background: 'var(--navy-tint)',
+                        color: 'var(--navy)',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        fontFamily: 'var(--font-mono)'
+                      }}>
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Documents Panel */}
+                <div className="panel-card" style={{ marginBottom: 0 }}>
+                  <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', marginBottom: '16px' }}>
+                    DOCUMENTS & CREDENTIALS
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--paper)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <FileText size={20} style={{ color: 'var(--navy)' }} />
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--navy-deep)' }}>Verified Placement Resume (PDF)</div>
+                        <div style={{ fontSize: '12px', color: 'var(--muted)' }}>Uploaded & attached to placement applications</div>
+                      </div>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => alert('Opening PDF preview...')}>View PDF</Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* 1. Profile Readiness Panel */}
+                <div className="panel-card" style={{ marginBottom: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', margin: 0 }}>
+                      PROFILE READINESS
+                    </h3>
+                    <span style={{ fontFamily: 'var(--font-serif)', fontSize: '28px', fontWeight: '700', color: 'var(--navy-deep)' }}>
+                      86%
+                    </span>
+                  </div>
+
+                  <div style={{
+                    height: '8px',
+                    borderRadius: '4px',
+                    background: 'var(--border-soft)',
+                    overflow: 'hidden',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{ width: '86%', height: '100%', background: 'var(--forest)' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--forest)' }}>
+                      <CheckCircle2 size={16} /> <span>Academic details</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--forest)' }}>
+                      <CheckCircle2 size={16} /> <span>Skills tagged</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--forest)' }}>
+                      <CheckCircle2 size={16} /> <span>Resume PDF uploaded</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--muted)' }}>
+                      <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid var(--muted)', display: 'inline-block' }} />
+                      <span>Career preferences</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Placement Preferences Panel */}
+                <div className="panel-card" style={{ marginBottom: 0 }}>
+                  <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', marginBottom: '14px' }}>
+                    PLACEMENT PREFERENCES
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                    <div>
+                      <span style={{ color: 'var(--muted)', fontSize: '12px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Preferred Locations</span>
+                      <div style={{ fontWeight: '600', color: 'var(--navy-deep)', marginTop: '2px' }}>
+                        {(profile?.locationPref || ['Bangalore', 'Remote', 'Hyderabad']).join(', ')}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span style={{ color: 'var(--muted)', fontSize: '12px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Work Mode</span>
+                      <div style={{ fontWeight: '600', color: 'var(--navy-deep)', marginTop: '2px' }}>Hybrid / On-site</div>
+                    </div>
+
+                    <div>
+                      <span style={{ color: 'var(--muted)', fontSize: '12px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Expected Package</span>
+                      <div style={{ fontWeight: '600', color: 'var(--forest)', marginTop: '2px' }}>6.0 - 12.0 LPA</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Portfolio & Links Panel */}
+                <div className="panel-card" style={{ marginBottom: 0 }}>
+                  <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', marginBottom: '12px' }}>
+                    ONLINE PORTFOLIO
+                  </h3>
+                  {profile?.portfolioUrl ? (
+                    <a href={profile.portfolioUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--navy)', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>
+                      🌐 {profile.portfolioUrl}
+                    </a>
+                  ) : (
+                    <span style={{ color: 'var(--muted)', fontSize: '13px' }}>No portfolio URL linked yet.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 };

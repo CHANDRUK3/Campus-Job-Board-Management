@@ -5,6 +5,11 @@ const router = express.Router();
 const AnalyticsService = require('../services/analyticsService');
 const BulkOperationsService = require('../services/bulkOperationsService');
 const { authenticate, authorize } = require('../middleware/auth');
+const fs = require('fs');
+const uploadsImportsDir = path.join(__dirname, '../uploads/imports');
+if (!fs.existsSync(uploadsImportsDir)) {
+  fs.mkdirSync(uploadsImportsDir, { recursive: true });
+}
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({

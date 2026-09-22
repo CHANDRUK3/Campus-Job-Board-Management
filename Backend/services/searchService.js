@@ -154,27 +154,27 @@ class SearchService {
       
       const searchTerm = query.trim();
       
-      const [companies, skills, locations] = await Promise.all([
-        // Company name suggestions
-        Company.distinct('name', {
-          name: { $regex: searchTerm, $options: 'i' }
-        }).limit(limit),
-        
-        // Skills suggestions
-        Drive.aggregate([
-          { $match: { status: 'active' } },
-          { $unwind: '$skills' },
-          { $match: { skills: { $regex: searchTerm, $options: 'i' } } },
-          { $group: { _id: '$skills' } },
-          { $limit: limit }
-        ]).then(results => results.map(r => r._id)),
-        
-        // Location suggestions
-        Drive.distinct('location', {
-          location: { $regex: searchTerm, $options: 'i' },
-          status: 'active'
-        }).limit(limit)
+      const companiesData = await Company.distinct('name', {
+        name: { $regex: searchTerm, $options: 'i' }
+      });
+      const companies = companiesData.slice(0, limit);
+      
+      // Skills suggestions
+      const skillsData = await Drive.aggregate([
+        { $match: { status: 'active' } },
+        { $unwind: '$skills' },
+        { $match: { skills: { $regex: searchTerm, $options: 'i' } } },
+        { $group: { _id: '$skills' } },
+        { $limit: limit }
       ]);
+      const skills = skillsData.map(r => r._id);
+      
+      // Location suggestions
+      const locationsData = await Drive.distinct('location', {
+        location: { $regex: searchTerm, $options: 'i' },
+        status: 'active'
+      });
+      const locations = locationsData.slice(0, limit);
       
       return { companies, skills, locations };
     } catch (error) {

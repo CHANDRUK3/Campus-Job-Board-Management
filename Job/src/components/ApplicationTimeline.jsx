@@ -219,8 +219,8 @@ const ApplicationTimeline = ({ application, onBack, onAcceptOffer, onDeclineOffe
                 marginBottom: '20px',
                 lineHeight: '1.8'
               }}>
-                <p><strong>Position:</strong> {application.job?.jobTitle}</p>
-                <p><strong>Compensation Package:</strong> {application.outcome?.offerDetails?.ctc || application.job?.salary?.max || 6} LPA</p>
+                <p><strong>Position:</strong> {application.drive?.jobTitle}</p>
+                <p><strong>Compensation Package:</strong> {application.outcome?.offerDetails?.ctc || application.drive?.salary?.max || 6} LPA</p>
                 <p><strong>Tentative Joining Date:</strong> {application.outcome?.offerDetails?.joiningDate ? new Date(application.outcome.offerDetails.joiningDate).toLocaleDateString() : 'TBD'}</p>
               </div>
 
@@ -276,10 +276,10 @@ const ApplicationTimeline = ({ application, onBack, onAcceptOffer, onDeclineOffe
                   💡 Suggested Prep & Improvement Resources
                 </h4>
                 <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '12px' }}>
-                  Based on the drive skills profile ({application.job?.skills?.join(', ') || 'General'}), we recommend brushing up on these courses:
+                  Based on the drive skills profile ({application.drive?.skills?.join(', ') || 'General'}), we recommend brushing up on these courses:
                 </p>
                 <div style={{ display: 'grid', gap: '10px' }}>
-                  {getSkillRecommendations(application.job?.skills).map((course, i) => (
+                  {getSkillRecommendations(application.drive?.skills).map((course, i) => (
                     <div key={i} style={{
                       background: 'rgba(30,41,59,0.4)',
                       borderRadius: '6px',

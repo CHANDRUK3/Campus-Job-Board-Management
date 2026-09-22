@@ -1,574 +1,541 @@
 import React, { useState, useEffect } from 'react';
-import EnhancedAdminDashboard from '../components/EnhancedAdminDashboard';
-import StudentDashboard from '../components/StudentDashboard';
-import JobSearch from '../components/JobSearch';
-import JobCard from '../components/JobCard';
-import Pagination from '../components/Pagination';
-import { getUser, jobsAPI, optStatusAPI, studentAPI } from '../utils/api';
+import { useNavigate } from 'react-router-dom';
+import PublicLayout from '../components/ui/Layout/PublicLayout';
+import DriveCard from '../components/DriveCard';
+import { getUser, drivesAPI, profileAPI } from '../utils/api';
+import { Button } from '../components/ui';
+import { Search, Filter, Briefcase, Building2, AlertCircle, RefreshCw, ArrowUpDown, LayoutGrid, List, CheckCircle2, CircleX, ArrowRight, MapPin } from 'lucide-react';
+import '../style.css';
 
 const Jobs = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [jobs, setJobs] = useState([]);
-  const [pagination, setPagination] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [jobForm, setJobForm] = useState({ 
-    company: '', 
-    jobTitle: '',
-    description: '',
-    skills: '', 
-    salary: { min: '', max: '' },
-    location: '',
-    jobType: 'full-time',
-    experienceLevel: 'fresher',
-    members: '',
-    applicationDeadline: '',
-    requirements: [],
-    benefits: [],
-    contactEmail: '',
-    website: ''
-  });
-  const [optedJobs, setOptedJobs] = useState([]);
-  const [formErrors, setFormErrors] = useState({});
-
-  const fetchJobs = async (email, role) => {
-    try {
-      if (role === 'admin') {
-        const data = await jobsAPI.getByAdmin(email);
-        setJobs(data);
-      } else {
-        // Use search API to get all jobs with pagination
-        const data = await jobsAPI.search({ page: 1, limit: 50 });
-        setJobs(data.jobs || []);
-        setPagination(data.pagination || {});
-      }
-    } catch (err) {
-      console.error('❌ Failed to fetch jobs', err);
-      // Fallback to basic getAll if search fails
-      try {
-        const data = await jobsAPI.getAll();
-        setJobs(data);
-        console.log('✅ Fallback fetch successful, got jobs:', data.length);
-      } catch (fallbackErr) {
-        console.error('❌ Fallback fetch also failed', fallbackErr);
-        setJobs([]);
-      }
-    }
-  };
+  const [studentProfile, setStudentProfile] = useState(null);
+  const [drives, setDrives] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  // View mode, Filter, Search & Sort states
+  const [viewMode, setViewMode] = useState('ticket'); // 'ticket' | 'classic'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState('all');
+  const [selectedDept, setSelectedDept] = useState('all');
+  const [sortBy, setSortBy] = useState('deadline');
 
   useEffect(() => {
     const currentUser = getUser();
     if (currentUser) {
       setUser(currentUser);
-      fetchJobs(currentUser.email, currentUser.role);
       if (currentUser.role === 'student') {
-        fetchOptedJobs(currentUser.email);
+        fetchStudentData(currentUser.id || currentUser._id);
       }
-    } else {
-      // If no user, still try to fetch jobs for public viewing
-      fetchJobs(null, 'public');
     }
+    fetchDrives();
   }, []);
 
-  const fetchOptedJobs = async (email) => {
+  const fetchStudentData = async (userId) => {
     try {
-      const data = await optStatusAPI.getByStudent(email);
-      const jobIds = data.filter(opt => opt.status === 'opt-in').map(opt => opt.jobId);
-      setOptedJobs(jobIds);
+      const [profData, appsData] = await Promise.all([
+        profileAPI.getProfile(userId).catch(() => null),
+        fetch(`http://localhost:5000/api/applications/my`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
+        }).then(res => res.ok ? res.json() : []).catch(() => [])
+      ]);
+      if (profData) setStudentProfile(profData);
+      if (Array.isArray(appsData)) setApplications(appsData);
     } catch (err) {
-      console.error('❌ Failed to fetch opted jobs', err);
+      console.error('Error fetching student data:', err);
     }
   };
 
-  const handleSearchResults = (results) => {
-    setJobs(results.jobs || []);
-    setPagination(results.pagination || {});
-  };
-
-  const handlePageChange = (page) => {
-    // This will be handled by the JobSearch component
-  };
-
-  const handleJobChange = (e) => {
-    const { name, value } = e.target;
-    if (name.startsWith('salary.')) {
-      const salaryField = name.split('.')[1];
-      setJobForm(prev => ({
-        ...prev,
-        salary: { ...prev.salary, [salaryField]: value }
-      }));
-    } else {
-      setJobForm(prev => ({ ...prev, [name]: value }));
-    }
-  };
-
-  const handleJobSubmit = async (e) => {
-    e.preventDefault();
+  const fetchDrives = async () => {
     try {
-      // Parse skills from string to array
-      const skillsArray = jobForm.skills.split(',').map(s => s.trim()).filter(s => s);
-      
-      // Validate required fields
-      if (!jobForm.company.trim()) {
-        alert('Company name is required');
-        return;
-      }
-      if (!jobForm.jobTitle.trim()) {
-        alert('Job title is required');
-        return;
-      }
-      if (!jobForm.description.trim()) {
-        alert('Job description is required');
-        return;
-      }
-      if (skillsArray.length === 0) {
-        alert('At least one skill is required');
-        return;
-      }
-      if (!jobForm.location.trim()) {
-        alert('Location is required');
-        return;
-      }
-      if (!jobForm.salary.min || !jobForm.salary.max) {
-        alert('Both minimum and maximum salary are required');
-        return;
-      }
-      if (!jobForm.members || jobForm.members < 1) {
-        alert('Number of positions must be at least 1');
-        return;
-      }
-      if (!jobForm.applicationDeadline) {
-        alert('Application deadline is required');
-        return;
-      }
+      setLoading(true);
+      setError('');
+      const data = await drivesAPI.getAll();
+      setDrives(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching drives:', err);
+      setError('Failed to load placement drives. Please make sure the server is running.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // Validate salary values
-      const minSalary = parseFloat(jobForm.salary.min);
-      const maxSalary = parseFloat(jobForm.salary.max);
-      
-      if (isNaN(minSalary) || isNaN(maxSalary)) {
-        alert('Salary values must be valid numbers');
-        return;
-      }
-      
-      if (minSalary <= 0 || maxSalary <= 0) {
-        alert('Salary values must be greater than 0');
-        return;
-      }
-      
-      if (maxSalary < minSalary) {
-        alert('Maximum salary must be greater than or equal to minimum salary');
-        return;
-      }
+  const handleOptIn = async (drive) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (user.role !== 'student') {
+      alert('Only students can opt-in for recruitment drives.');
+      return;
+    }
 
-      // Validate deadline
-      const deadline = new Date(jobForm.applicationDeadline);
-      if (isNaN(deadline.getTime())) {
-        alert('Please enter a valid application deadline');
-        return;
-      }
-      
-      if (deadline <= new Date()) {
-        alert('Application deadline must be in the future');
-        return;
-      }
-
-      // Build payload and drop optional empty strings so backend optional() validators don't fail
-      const newJobRaw = {
-        ...jobForm,
-        skills: skillsArray,
-        salary: {
-          min: minSalary,
-          max: maxSalary,
-          currency: 'INR'
+    try {
+      const response = await fetch('http://localhost:5000/api/applications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         },
-        members: parseInt(jobForm.members, 10),
-        applicationDeadline: deadline.toISOString(),
-      };
-
-      const newJob = Object.fromEntries(
-        Object.entries(newJobRaw).filter(([key, value]) => {
-          if (value === null || value === undefined) return false;
-          if (typeof value === 'string' && value.trim() === '') return false;
-          return true;
-        })
-      );
-
-      // Clean nested optional fields
-      if (newJob.contactEmail && newJob.contactEmail.trim() === '') delete newJob.contactEmail;
-      if (newJob.website && newJob.website.trim() === '') delete newJob.website;
-      if (Array.isArray(newJob.requirements) && newJob.requirements.length === 0) delete newJob.requirements;
-      if (Array.isArray(newJob.benefits) && newJob.benefits.length === 0) delete newJob.benefits;
-
-      console.log('Submitting job:', newJob);
-      console.log('User token:', localStorage.getItem('accessToken'));
-      const result = await jobsAPI.create(newJob);
-      console.log('Job creation result:', result);
-      
-      // Reset form
-      setJobForm({ 
-        company: '', 
-        jobTitle: '',
-        description: '',
-        skills: '', 
-        salary: { min: '', max: '' },
-        location: '',
-        jobType: 'full-time',
-        experienceLevel: 'fresher',
-        members: '',
-        applicationDeadline: '',
-        requirements: [],
-        benefits: [],
-        contactEmail: '',
-        website: ''
+        body: JSON.stringify({ driveId: drive._id })
       });
-      setShowForm(false);
-      setFormErrors({});
-      alert('Job posted successfully!');
-      fetchJobs(user.email, user.role);
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.message || 'Failed to opt in for drive');
+      }
+
+      alert(`Successfully opted in for ${drive.companyId?.name || drive.company || 'drive'}!`);
+      if (user.id || user._id) {
+        fetchStudentData(user.id || user._id);
+      }
     } catch (err) {
-      console.error('❌ Failed to add job', err);
-      // Show more specific error message and surface field errors
-      if (err.data && Array.isArray(err.data.errors)) {
-        const fe = {};
-        err.data.errors.forEach(e => { if (e.field) fe[e.field] = e.message; });
-        setFormErrors(fe);
-        alert(err.data.message || 'Validation failed. Please fix highlighted fields.');
-      } else if (err.status === 403) {
-        alert('Access denied. Admin permissions are required to post jobs.');
-      } else if (err.status === 401 || (err.message && err.message.includes('Session expired'))) {
-        alert('Your session has expired. Please login again.');
-        window.location.href = '/login';
-      } else {
-        alert('Failed to post job: ' + (err.message || 'Please try again.'));
-      }
+      alert(err.message || 'Error opting in for drive');
     }
   };
 
-  const handleOptIn = async (job) => {
-    try {
-      if (!user?.email) {
-        alert('User email not found!');
-        return;
-      }
-      
-      await optStatusAPI.set({
-        studentEmail: user.email,
-        jobId: job._id,
-        status: 'opt-in'
-      });
-      
-      await fetchOptedJobs(user.email);
-    } catch (error) {
-      console.error('❌ Opt-in failed:', error);
-      alert('❌ Opt-in failed: ' + error.message);
-    }
+  const handleViewDrive = (drive) => {
+    navigate(`/placement-drives/${drive._id}`);
   };
 
-  const handleOptOut = async (job) => {
-    try {
-      if (!user?.email) {
-        alert('User email not found!');
-        return;
-      }
-      
-      await optStatusAPI.set({
-        studentEmail: user.email,
-        jobId: job._id,
-        status: 'opt-out'
-      });
-      
-      await fetchOptedJobs(user.email);
-    } catch (error) {
-      console.error('❌ Opt-out failed:', error);
-      alert('❌ Opt-out failed: ' + error.message);
-    }
+  // Helper to evaluate drive eligibility for student profile
+  const checkDriveEligibility = (drive) => {
+    if (!studentProfile) return { eligible: false, reasons: ['Profile not found'] };
+    if (studentProfile.profileStatus !== 'verified') return { eligible: false, reasons: ['Pending verification'] };
+    const reasons = [];
+    const minCgpa = drive.eligibilityRules?.minCgpa || 0;
+    if (studentProfile.cgpa < minCgpa) reasons.push(`CGPA ${studentProfile.cgpa} < Cutoff ${minCgpa}`);
+    const maxBacklogs = drive.eligibilityRules?.maxBacklogs ?? 0;
+    if (studentProfile.backlogs > maxBacklogs) reasons.push(`Backlogs ${studentProfile.backlogs} > Max ${maxBacklogs}`);
+    return { eligible: reasons.length === 0, reasons };
   };
 
-  const handleApply = async (jobId) => {
-    try {
-      await studentAPI.createApplication(jobId);
-      alert('Application submitted successfully!');
-      // Refresh applications or update UI
-    } catch (error) {
-      console.error('Application error:', error);
-      if (error.message.includes('already exists')) {
-        alert('You have already applied for this job');
-      } else {
-        alert('Failed to submit application');
-      }
-    }
-  };
+  // Filter & Sort drives
+  const filteredDrives = drives
+    .filter(drive => {
+      const companyName = drive.companyId?.name || drive.company || '';
+      const roleTitle = drive.role || drive.jobTitle || '';
+      const skills = (drive.skills || []).join(' ');
+      const query = searchQuery.toLowerCase();
 
-  if (!user) {
-    return (
-      <div className="jobs-container">
-        <h2>💼 Job Opportunities</h2>
-        <p>Please log in to apply for jobs or manage your applications.</p>
-        
-        <JobSearch 
-          onSearchResults={handleSearchResults}
-          onLoading={setLoading}
-        />
-        
-        {loading && <div className="loading">Searching jobs...</div>}
-        
-        <div className="job-list">
-          {jobs.length === 0 ? (
-            <div className="no-jobs">
-              <p>No jobs found matching your criteria.</p>
-              <p>Try adjusting your search or filters.</p>
-            </div>
-          ) : (
-            jobs.map((job) => (
-              <JobCard
-                key={job._id}
-                job={job}
-                user={null}
-                onOptIn={() => alert('Please log in to opt-in for jobs')}
-                onOptOut={() => alert('Please log in to manage your applications')}
-                optedJobs={[]}
-                onApply={() => alert('Please log in to apply for jobs')}
-              />
-            ))
-          )}
-        </div>
-        
-        {pagination.totalPages > 1 && (
-          <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            hasNextPage={pagination.hasNextPage}
-            hasPrevPage={pagination.hasPrevPage}
-            onPageChange={handlePageChange}
-            totalCount={pagination.totalCount}
-            limit={pagination.limit}
-          />
-        )}
-      </div>
-    );
-  }
+      const matchesSearch = !searchQuery || 
+        companyName.toLowerCase().includes(query) ||
+        roleTitle.toLowerCase().includes(query) ||
+        skills.toLowerCase().includes(query);
+
+      const matchesType = selectedType === 'all' || (drive.jobType || '').toLowerCase() === selectedType.toLowerCase();
+
+      const allowedDepts = drive.eligibilityRules?.allowedDepartments || [];
+      const matchesDept = selectedDept === 'all' || 
+        allowedDepts.length === 0 || 
+        allowedDepts.some(d => d.toLowerCase() === selectedDept.toLowerCase());
+
+      return matchesSearch && matchesType && matchesDept;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'salary') {
+        return (b.package || 0) - (a.package || 0);
+      }
+      if (sortBy === 'newest') {
+        return new Date(b.createdAt || Date.now()) - new Date(a.createdAt || Date.now());
+      }
+      // default: deadline
+      return new Date(a.importantDates?.registrationDeadline || Date.now()) - new Date(b.importantDates?.registrationDeadline || Date.now());
+    });
 
   return (
-    <div className="jobs-container">
-      {user.role === 'admin' ? (
-        <>
-          <div className="job-header">
-            <h2>💼 Manage Job Postings</h2>
-            <button onClick={() => setShowForm(!showForm)}>➕ Add Job</button>
+    <PublicLayout>
+      <div style={{
+        maxWidth: '1240px',
+        margin: '0 auto',
+        padding: '36px 32px 60px 32px'
+      }}>
+        {/* Page Header */}
+        <div style={{ marginBottom: '28px' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '12px',
+            color: 'var(--gold)',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            marginBottom: '8px'
+          }}>
+            <Briefcase size={14} />
+            <span>CAMPUS RECRUITMENT DRIVES</span>
+          </div>
+          <h1 style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: '32px',
+            fontWeight: '700',
+            color: 'var(--navy-deep)',
+            margin: '0 0 8px 0'
+          }}>
+            Placement Drives
+          </h1>
+          <p style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: '15px',
+            color: 'var(--muted)',
+            margin: 0,
+            maxWidth: '640px'
+          }}>
+            Explore verified placement drives scheduled by leading companies for Kongu Engineering College students.
+          </p>
+        </div>
+
+        {/* Search & Toolbar */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '10px',
+          border: '1px solid var(--border)',
+          padding: '16px 20px',
+          marginBottom: '28px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '16px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 2px 6px rgba(12, 27, 54, 0.03)'
+        }}>
+          {/* Search Input */}
+          <div style={{ position: 'relative', flex: '1 1 320px', minWidth: '260px' }}>
+            <Search size={18} style={{
+              position: 'absolute',
+              left: '14px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--muted)'
+            }} />
+            <input
+              type="text"
+              placeholder="Search companies, roles, or skills (e.g., React, Java)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                height: '44px',
+                padding: '0 16px 0 42px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--paper)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: '14px',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
           </div>
 
-          {showForm && (
-            <div className="job-form-container">
-              <h3>Post New Job</h3>
-              <form onSubmit={handleJobSubmit} className="job-form">
-                <div className="form-row">
-                  <div className="field-group">
-                    <input 
-                      name="company" 
-                      placeholder="Company Name" 
-                      value={jobForm.company} 
-                      onChange={handleJobChange} 
-                      aria-invalid={!!formErrors.company}
-                      required 
-                    />
-                    {formErrors.company && <small className="field-error">{formErrors.company}</small>}
-                  </div>
-                  <div className="field-group">
-                    <input 
-                      name="jobTitle" 
-                      placeholder="Job Title" 
-                      value={jobForm.jobTitle} 
-                      onChange={handleJobChange} 
-                      aria-invalid={!!formErrors.jobTitle}
-                      required 
-                    />
-                    {formErrors.jobTitle && <small className="field-error">{formErrors.jobTitle}</small>}
-                  </div>
-                </div>
-                
-                <div className="field-group full-row">
-                  <textarea 
-                    name="description" 
-                    placeholder="Job Description" 
-                    value={jobForm.description} 
-                    onChange={handleJobChange} 
-                    aria-invalid={!!formErrors.description}
-                    rows="4"
-                    required 
-                  />
-                  {formErrors.description && <small className="field-error">{formErrors.description}</small>}
-                </div>
-                
-                <div className="form-row">
-                  <div className="field-group">
-                    <input 
-                      name="skills" 
-                      placeholder="Skills (comma separated)" 
-                      value={jobForm.skills} 
-                      onChange={handleJobChange} 
-                      aria-invalid={!!formErrors.skills}
-                      required 
-                    />
-                    {formErrors.skills && <small className="field-error">{formErrors.skills}</small>}
-                  </div>
-                  <div className="field-group">
-                    <input 
-                      name="location" 
-                      placeholder="Location" 
-                      value={jobForm.location} 
-                      onChange={handleJobChange} 
-                      aria-invalid={!!formErrors.location}
-                      required 
-                    />
-                    {formErrors.location && <small className="field-error">{formErrors.location}</small>}
-                  </div>
-                </div>
-                
-                <div className="form-row">
-                  <div className="field-group">
-                    <input 
-                      name="salary.min" 
-                      type="number"
-                      placeholder="Min Salary (LPA)" 
-                      value={jobForm.salary.min} 
-                      onChange={handleJobChange} 
-                      aria-invalid={!!formErrors['salary.min']}
-                      required 
-                    />
-                    {formErrors['salary.min'] && <small className="field-error">{formErrors['salary.min']}</small>}
-                  </div>
-                  <div className="field-group">
-                    <input 
-                      name="salary.max" 
-                      type="number"
-                      placeholder="Max Salary (LPA)" 
-                      value={jobForm.salary.max} 
-                      onChange={handleJobChange} 
-                      aria-invalid={!!formErrors['salary.max']}
-                      required 
-                    />
-                    {formErrors['salary.max'] && <small className="field-error">{formErrors['salary.max']}</small>}
-                  </div>
-                </div>
-                
-                <div className="form-row">
-                  <select name="jobType" value={jobForm.jobType} onChange={handleJobChange}>
-                    <option value="full-time">Full-time</option>
-                    <option value="part-time">Part-time</option>
-                    <option value="internship">Internship</option>
-                    <option value="contract">Contract</option>
-                  </select>
-                  
-                  <select name="experienceLevel" value={jobForm.experienceLevel} onChange={handleJobChange}>
-                    <option value="fresher">Fresher</option>
-                    <option value="1-2 years">1-2 years</option>
-                    <option value="3-5 years">3-5 years</option>
-                    <option value="5+ years">5+ years</option>
-                  </select>
-                </div>
-                
-                <div className="form-row">
-                  <div className="field-group">
-                    <input 
-                      name="members" 
-                      type="number"
-                      placeholder="Number of Positions" 
-                      value={jobForm.members} 
-                      onChange={handleJobChange} 
-                      aria-invalid={!!formErrors.members}
-                      required 
-                    />
-                    {formErrors.members && <small className="field-error">{formErrors.members}</small>}
-                  </div>
-                  <div className="field-group">
-                    <input 
-                      name="applicationDeadline" 
-                      type="datetime-local"
-                      placeholder="Application Deadline" 
-                      value={jobForm.applicationDeadline} 
-                      onChange={handleJobChange} 
-                      aria-invalid={!!formErrors.applicationDeadline}
-                      required 
-                    />
-                    {formErrors.applicationDeadline && <small className="field-error">{formErrors.applicationDeadline}</small>}
-                  </div>
-                </div>
-                
-                <div className="form-row">
-                  <input 
-                    name="contactEmail" 
-                    type="email"
-                    placeholder="Contact Email" 
-                    value={jobForm.contactEmail} 
-                    onChange={handleJobChange} 
-                  />
-                  <input 
-                    name="website" 
-                    type="url"
-                    placeholder="Company Website" 
-                    value={jobForm.website} 
-                    onChange={handleJobChange} 
-                  />
-                </div>
-                
-                <button type="submit" className="submit-btn">Post Job</button>
-              </form>
+          {/* Filters Group */}
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--muted)' }}>
+              <Filter size={15} />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase' }}>Filter:</span>
             </div>
-          )}
 
-          <EnhancedAdminDashboard user={user} />
-        </>
-      ) : user.role === 'student' ? (
-        <StudentDashboard user={user} />
-      ) : (
-        <>
-          <h2>💼 Job Opportunities</h2>
-          
-          <JobSearch 
-            onSearchResults={handleSearchResults}
-            onLoading={setLoading}
-          />
-          
-          {loading && <div className="loading">Searching jobs...</div>}
-          
-          <div className="job-list">
-            {jobs.length === 0 ? (
-              <div className="no-jobs">
-                <p>No jobs found matching your criteria.</p>
-                <p>Try adjusting your search or filters.</p>
+            {/* Department Filter */}
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              style={{
+                height: '40px',
+                padding: '0 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: '#ffffff',
+                fontFamily: 'var(--font-sans)',
+                fontSize: '13px',
+                color: 'var(--text-primary)',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all">All Departments</option>
+              <option value="CSE">CSE</option>
+              <option value="ECE">ECE</option>
+              <option value="EEE">EEE</option>
+              <option value="MECH">MECH</option>
+              <option value="MBA">MBA</option>
+            </select>
+
+            {/* Job Type Filter */}
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              style={{
+                height: '40px',
+                padding: '0 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: '#ffffff',
+                fontFamily: 'var(--font-sans)',
+                fontSize: '13px',
+                color: 'var(--text-primary)',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all">All Types</option>
+              <option value="full-time">Full-time</option>
+              <option value="internship">Internship</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--muted)' }}>
+            <RefreshCw size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: '12px' }} />
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: '15px' }}>Loading active recruitment drives...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '16px 20px',
+            borderRadius: '8px',
+            background: 'var(--brick-tint)',
+            border: '1px solid rgba(161, 61, 43, 0.2)',
+            color: 'var(--brick)',
+            fontSize: '14px',
+            marginBottom: '24px'
+          }}>
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Drives Listing Container */}
+        {!loading && !error && (
+          <>
+            {/* Metadata Bar & View Mode Toggle + Custom Sort Control */}
+            <div style={{
+              display: 'flex',
+              justify: 'space-between',
+              alignItems: 'center',
+              marginBottom: '20px',
+              flexWrap: 'wrap',
+              gap: '12px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              color: 'var(--muted)'
+            }}>
+              <span>SHOWING {filteredDrives.length} OF {drives.length} RECRUITMENT DRIVES</span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {/* View Mode Segmented Control */}
+                <div style={{
+                  display: 'inline-flex',
+                  background: '#ffffff',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '2px'
+                }}>
+                  <button
+                    onClick={() => setViewMode('ticket')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      height: '32px',
+                      padding: '0 10px',
+                      borderRadius: '4px',
+                      background: viewMode === 'ticket' ? 'var(--navy-tint)' : 'transparent',
+                      color: viewMode === 'ticket' ? 'var(--navy-deep)' : 'var(--muted)',
+                      border: 'none',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <LayoutGrid size={13} />
+                    <span>ADMIT TICKET VIEW</span>
+                  </button>
+
+                  <button
+                    onClick={() => setViewMode('classic')}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      height: '32px',
+                      padding: '0 10px',
+                      borderRadius: '4px',
+                      background: viewMode === 'classic' ? 'var(--navy-tint)' : 'transparent',
+                      color: viewMode === 'classic' ? 'var(--navy-deep)' : 'var(--muted)',
+                      border: 'none',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <List size={13} />
+                    <span>CLASSIC LEDGER VIEW</span>
+                  </button>
+                </div>
+
+                {/* Sort Dropdown */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ArrowUpDown size={14} style={{ color: 'var(--muted)' }} />
+                  <span>SORT:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    style={{
+                      height: '36px',
+                      padding: '0 10px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '11px',
+                      textTransform: 'uppercase',
+                      background: '#ffffff',
+                      color: 'var(--navy-deep)',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="deadline">RECENT DEADLINE</option>
+                    <option value="salary">HIGHEST CTC PACKAGE</option>
+                    <option value="newest">NEWEST PUBLISHED</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {filteredDrives.length === 0 ? (
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '10px',
+                border: '1px solid var(--border)',
+                padding: '60px 20px',
+                textAlign: 'center',
+                color: 'var(--muted)'
+              }}>
+                <Building2 size={36} style={{ marginBottom: '12px', color: 'var(--muted)', opacity: 0.5 }} />
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', margin: '0 0 6px 0' }}>
+                  No placement drives found
+                </h3>
+                <p style={{ fontSize: '14px', margin: 0 }}>
+                  Try adjusting your search terms or department filters to see active drives.
+                </p>
+              </div>
+            ) : viewMode === 'ticket' ? (
+              /* MODERN TICKET VIEW */
+              <div style={{ display: 'grid', gap: '20px' }}>
+                {filteredDrives.map(drive => (
+                  <DriveCard
+                    key={drive._id}
+                    drive={drive}
+                    profile={studentProfile}
+                    applications={applications}
+                    onOptIn={(d) => handleOptIn(d)}
+                    onView={() => handleViewDrive(drive)}
+                  />
+                ))}
               </div>
             ) : (
-              jobs.map((job) => (
-                            <JobCard
-                              key={job._id}
-                              job={job}
-                              user={user}
-                              onOptIn={handleOptIn}
-                              onOptOut={handleOptOut}
-                              optedJobs={optedJobs}
-                              onApply={handleApply}
-                            />
-              ))
+              /* CLASSIC INSTITUTIONAL LEDGER VIEW */
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '10px',
+                border: '1px solid var(--border)',
+                overflow: 'hidden',
+                boxShadow: '0 2px 6px rgba(12, 27, 54, 0.03)'
+              }}>
+                <table className="ledger-table">
+                  <thead>
+                    <tr>
+                      <th>DRIVE REF</th>
+                      <th>COMPANY & ROLE</th>
+                      <th>PACKAGE CTC</th>
+                      <th>LOCATION & MODE</th>
+                      <th>ELIGIBILITY</th>
+                      <th>DEADLINE</th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDrives.map(drive => {
+                      const refCode = `DRIVE-2026-${(drive._id || 'E0A').substring(drive._id ? drive._id.length - 3 : 0).toUpperCase()}`;
+                      const companyName = drive.companyId?.name || drive.company || 'Partner Company';
+                      const elig = checkDriveEligibility(drive);
+                      const isApplied = applications.some(app => (app.drive?._id || app.drive) === drive._id);
+                      const deadlineStr = drive.importantDates?.registrationDeadline
+                        ? new Date(drive.importantDates.registrationDeadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : 'Open';
+
+                      return (
+                        <tr key={drive._id}>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)', fontWeight: '600' }}>
+                            {refCode}
+                          </td>
+                          <td>
+                            <div style={{ fontFamily: 'var(--font-serif)', fontWeight: '700', fontSize: '16px', color: 'var(--navy-deep)' }}>
+                              {drive.role || drive.jobTitle}
+                            </div>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                              {companyName}
+                            </div>
+                          </td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontWeight: '700', color: 'var(--forest)', fontSize: '14px' }}>
+                            ₹{drive.package} LPA
+                          </td>
+                          <td style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <MapPin size={13} style={{ color: 'var(--muted)' }} />
+                              <span>{Array.isArray(drive.location) ? drive.location.join(', ') : drive.location}</span>
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '2px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                              {drive.workMode || 'Hybrid'} · {(drive.jobType || 'full-time').toUpperCase()}
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`badge ${elig.eligible ? 'badge-forest' : 'badge-brick'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              {elig.eligible ? <CheckCircle2 size={12} /> : <CircleX size={12} />}
+                              <span>{elig.eligible ? '✓ Eligible' : '✕ Ineligible'}</span>
+                            </span>
+                          </td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--gold)', fontWeight: '600' }}>
+                            {deadlineStr}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              {isApplied ? (
+                                <Button variant="secondary" size="sm" disabled>✓ Applied</Button>
+                              ) : elig.eligible ? (
+                                <Button className="btn-gold" size="sm" onClick={() => handleOptIn(drive)}>
+                                  Opt In
+                                </Button>
+                              ) : null}
+                              <Button variant="secondary" size="sm" onClick={() => handleViewDrive(drive)}>
+                                View Details →
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </div>
-          
-          {pagination.totalPages > 1 && (
-            <Pagination
-              currentPage={pagination.currentPage}
-              totalPages={pagination.totalPages}
-              hasNextPage={pagination.hasNextPage}
-              hasPrevPage={pagination.hasPrevPage}
-              onPageChange={handlePageChange}
-              totalCount={pagination.totalCount}
-              limit={pagination.limit}
-            />
-          )}
-        </>
-      )}
-    </div>
+          </>
+        )}
+      </div>
+    </PublicLayout>
   );
 };
 
 export default Jobs;
-

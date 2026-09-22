@@ -9,7 +9,7 @@ const ProtectedRoute = ({ children, allowUnverified = false }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token || !user.id) {
+    if (!token || !(user.id || user._id)) {
       setLoading(false);
       return;
     }
@@ -20,7 +20,7 @@ const ProtectedRoute = ({ children, allowUnverified = false }) => {
     }
 
     // Fetch profile to verify status
-    fetch(`http://localhost:5000/api/profile/${user.id}`, {
+    fetch(`http://localhost:5000/api/profile/${user.id || user._id}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
@@ -42,7 +42,7 @@ const ProtectedRoute = ({ children, allowUnverified = false }) => {
       .finally(() => {
         setLoading(false);
       });
-  }, [token, user.id, user.role]);
+  }, [token, user.id, user._id, user.role]);
 
   if (!token || !user.email) {
     return <Navigate to="/login" state={{ from: location }} replace />;

@@ -9,10 +9,7 @@ const Notification = require('./models/Notification');
 const OptStatus = require('./models/OptStatus');
 
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/jobboard', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+mongoose.connect('mongodb://localhost:27017/jobboard')
   .then(() => console.log('✅ MongoDB connected for seeding'))
   .catch(err => console.error('❌ Connection error:', err));
 
@@ -22,13 +19,6 @@ const sampleUsers = [
     email: 'admin@campus.edu',
     password: 'Admin123!',
     role: 'admin',
-    isActive: true
-  },
-  {
-    name: 'HR Recruiter',
-    email: 'recruiter@techcorp.com',
-    password: 'Recruiter123!',
-    role: 'recruiter',
     isActive: true
   },
   {
@@ -127,8 +117,8 @@ async function seedDatabase() {
       {
         companyId: techCorp._id,
         role: 'Software Engineer',
-        package: 10, // 10 LPA
-        description: 'Join the core platform engineering team working on React dashboard frameworks, microservices architecture in Node.js, and high performance MongoDB query engines. Requires analytical thinking and solid understanding of data structures.',
+        package: 10.0, // 10 LPA
+        description: 'Join the core platform engineering team working on React dashboard frameworks, microservices architecture in Node.js, and high performance MongoDB query engines.',
         skills: ['JavaScript', 'React', 'Node.js', 'MongoDB'],
         location: ['Bangalore', 'Remote'],
         workMode: 'hybrid',
@@ -142,7 +132,7 @@ async function seedDatabase() {
           allowPlaced: true
         },
         importantDates: {
-          registrationDeadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days from now
+          registrationDeadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
           testDate: new Date(Date.now() + 18 * 24 * 60 * 60 * 1000),
           interviewDate: new Date(Date.now() + 22 * 24 * 60 * 60 * 1000)
         },
@@ -154,7 +144,7 @@ async function seedDatabase() {
         companyId: dataFlow._id,
         role: 'Data Analyst',
         package: 7.5,
-        description: 'Responsible for building ETL pipelines, analyzing user engagement event streams, and creating business visualization dashboards. Experience with Python, Pandas, SQL, and Tableau is required.',
+        description: 'Responsible for building ETL pipelines, analyzing user engagement event streams, and creating business visualization dashboards using Python, Pandas, and SQL.',
         skills: ['Python', 'SQL', 'Pandas', 'Tableau'],
         location: ['Mumbai'],
         workMode: 'onsite',
@@ -179,8 +169,8 @@ async function seedDatabase() {
       {
         companyId: cloudTech._id,
         role: 'DevOps Intern',
-        package: 4.8, // 4.8 LPA (equivalent to 40k monthly)
-        description: 'Help manage cloud infrastructure provisioning using Terraform. Set up CI/CD automation pipelines in GitHub actions. Monitor AWS cloud metrics and maintain Docker swarm container registries.',
+        package: 4.8,
+        description: 'Help manage cloud infrastructure provisioning using Terraform. Set up CI/CD automation pipelines in GitHub Actions and monitor AWS cloud metrics.',
         skills: ['AWS', 'Docker', 'Linux', 'GitHub Actions'],
         location: ['Hyderabad'],
         workMode: 'remote',
@@ -191,7 +181,7 @@ async function seedDatabase() {
           allowedDepartments: ['CSE'],
           maxBacklogs: 0,
           gradYears: [2026],
-          allowPlaced: false // Places check! Block placed students
+          allowPlaced: false
         },
         importantDates: {
           registrationDeadline: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000),
@@ -207,7 +197,11 @@ async function seedDatabase() {
     const createdDrives = await Drive.insertMany(sampleDrives);
     console.log(`💼 Created ${createdDrives.length} active recruitment drives`);
 
-    // 4. Create Student Profiles (John: CSE 8.2 verified, Jane: ECE 6.8 verified, Bob: CSE null pending)
+    const techCorpDrive = createdDrives.find(d => d.role === 'Software Engineer');
+    const dataFlowDrive = createdDrives.find(d => d.role === 'Data Analyst');
+    const cloudTechDrive = createdDrives.find(d => d.role === 'DevOps Intern');
+
+    // 4. Create Student Profiles for all 3 students
     const sampleStudentProfiles = [
       {
         user: johnUser._id,
@@ -221,7 +215,7 @@ async function seedDatabase() {
         skills: ['JavaScript', 'React', 'Node.js', 'Python'],
         locationPref: ['Bangalore', 'Remote'],
         profileStatus: 'verified',
-        academicHistory: 'B.Tech Computer Science and Engineering, CGPA: 8.2/10.0 (Aggregate). 12th State Board: 94%. 10th CBSE: 9.8 CGPA.',
+        academicHistory: 'B.Tech Computer Science & Engineering, CGPA: 8.2/10.0. 12th Board: 94%. 10th CBSE: 9.8 CGPA.',
         portfolioUrl: 'https://johndoe.dev',
         resumePath: '/uploads/resumes/john_sample.pdf'
       },
@@ -230,30 +224,116 @@ async function seedDatabase() {
         rollNo: 'EC202302',
         department: 'ECE',
         branch: 'B.Tech',
-        cgpa: 6.5,
+        cgpa: 6.8,
         backlogs: 0,
         gradYear: 2026,
         phone: '9876543211',
         skills: ['Python', 'SQL', 'C++', 'Embedded Systems'],
         locationPref: ['Mumbai', 'Hyderabad'],
         profileStatus: 'verified',
-        academicHistory: 'B.Tech Electronics and Communication Engineering, CGPA: 6.5/10.0. 12th Board: 88%.',
+        academicHistory: 'B.Tech Electronics & Communication Engineering, CGPA: 6.8/10.0. 12th Board: 88%.',
         portfolioUrl: 'https://janesmith.dev',
         resumePath: '/uploads/resumes/jane_sample.pdf'
+      },
+      {
+        user: bobUser._id,
+        rollNo: 'CS202303',
+        department: 'CSE',
+        branch: 'B.Tech',
+        cgpa: 8.5,
+        backlogs: 0,
+        gradYear: 2026,
+        phone: '9876543212',
+        skills: ['JavaScript', 'React', 'AWS', 'Docker', 'Python'],
+        locationPref: ['Bangalore', 'Hyderabad', 'Remote'],
+        profileStatus: 'verified',
+        academicHistory: 'B.Tech Computer Science & Engineering, CGPA: 8.5/10.0. 12th Board: 96%.',
+        portfolioUrl: 'https://bobjenkins.dev',
+        resumePath: '/uploads/resumes/bob_sample.pdf'
       }
-      // Bob is left without profile to test onboarding profile setup wizard on first login
     ];
 
     const createdProfiles = await StudentProfile.insertMany(sampleStudentProfiles);
-    console.log(`👨‍🎓 Created ${createdProfiles.length} verified student profiles. Bob Jenkins email = bob@student.edu is left unseeded to verify profile setup flow.`);
+    console.log(`👨‍🎓 Created ${createdProfiles.length} verified student profiles.`);
+
+    // 5. Create Sample Applications with Rich Timeline Stepper Data
+    const sampleApplications = [
+      {
+        student: johnUser._id,
+        drive: techCorpDrive._id,
+        status: 'technical_interview',
+        timeline: [
+          { stage: 'applied', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), notes: 'Application submitted via student portal.' },
+          { stage: 'verified', timestamp: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), notes: 'Academic profile verified by Placement Cell.' },
+          { stage: 'test_scheduled', timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), notes: 'Online Aptitude & Technical MCQs test scheduled.' },
+          { stage: 'test_completed', timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), notes: 'Scored 88/100 in Technical MCQs.' },
+          { stage: 'shortlisted', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), notes: 'Shortlisted for Technical Round 1.' },
+          { stage: 'technical_interview', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), notes: 'Technical Interview scheduled.' }
+        ],
+        testInterviewDetails: {
+          date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+          time: '10:30 AM IST',
+          venue: 'Placement Block Auditorium / Google Meet',
+          meetingLink: 'https://meet.google.com/abc-defg-hij',
+          instructions: 'Please bring 2 updated resume copies, valid college ID, and ensure stable internet.'
+        }
+      },
+      {
+        student: janeUser._id,
+        drive: dataFlowDrive._id,
+        status: 'applied',
+        timeline: [
+          { stage: 'applied', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), notes: 'Application submitted.' }
+        ]
+      }
+    ];
+
+    const createdApps = await Application.insertMany(sampleApplications);
+    console.log(`📑 Created ${createdApps.length} sample applications with timeline data`);
+
+    // 6. Create Notifications
+    const sampleNotifications = [
+      {
+        recipient: 'john@student.edu',
+        recipientId: johnUser._id,
+        type: 'interview_scheduled',
+        title: 'Technical Interview Scheduled',
+        message: 'Your Technical Interview with TechCorp Solutions for Software Engineer is scheduled for 10:30 AM.',
+        link: '/student/applications',
+        relatedDriveId: techCorpDrive._id,
+        relatedApplicationId: createdApps[0]._id,
+        isRead: false
+      },
+      {
+        recipient: 'jane@student.edu',
+        recipientId: janeUser._id,
+        type: 'drive_published',
+        title: 'New Drive Published',
+        message: 'DataFlow Inc has posted a Data Analyst drive matching your ECE department criteria.',
+        link: '/student/drives',
+        relatedDriveId: dataFlowDrive._id,
+        isRead: false
+      },
+      {
+        recipient: 'bob@student.edu',
+        recipientId: bobUser._id,
+        type: 'drive_published',
+        title: 'Welcome to Placement Portal',
+        message: 'Your student profile is verified! You can now explore placement drives and opt-in.',
+        link: '/student/drives',
+        isRead: false
+      }
+    ];
+
+    await Notification.insertMany(sampleNotifications);
+    console.log(`🔔 Created ${sampleNotifications.length} sample notifications`);
 
     console.log('✅ Seeding completed successfully!');
     console.log('\n🔐 Credentials:');
     console.log('   Admin:      admin@campus.edu / Admin123!');
-    console.log('   Recruiter:  recruiter@techcorp.com / Recruiter123!');
-    console.log('   Student 1:  john@student.edu / Student123! (Verified, CSE, 8.2 CGPA)');
-    console.log('   Student 2:  jane@student.edu / Student123! (Verified, ECE, 6.5 CGPA)');
-    console.log('   Student 3:  bob@student.edu / Student123!  (Pending setup, CSE)');
+    console.log('   Student 1:  john@student.edu / Student123! (Verified, CSE, 8.2 CGPA - Has Active Application & Interview Scheduled)');
+    console.log('   Student 2:  jane@student.edu / Student123! (Verified, ECE, 6.8 CGPA)');
+    console.log('   Student 3:  bob@student.edu  / Student123! (Verified, CSE, 8.5 CGPA)');
 
   } catch (error) {
     console.error('❌ Error seeding database:', error);

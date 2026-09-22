@@ -182,6 +182,7 @@ export const authAPI = {
 
 export const drivesAPI = {
   getAll: async () => apiRequest('/drives'),
+  getAllDrives: async () => apiRequest('/drives'),
   search: async (searchParams) => {
     const queryString = new URLSearchParams();
     Object.keys(searchParams).forEach(key => {
@@ -201,46 +202,16 @@ export const drivesAPI = {
   getByAdmin: async (adminEmail) => apiRequest(`/drives/${adminEmail}`),
 };
 
+export const driveAPI = drivesAPI;
+
 // Legacy alias — routes still work via /api/companies backward compat
-export const jobsAPI = {
-  getAll: async () => apiRequest('/drives'),
-
-  search: async (searchParams) => {
-    const queryString = new URLSearchParams();
-    Object.keys(searchParams).forEach(key => {
-      if (searchParams[key] !== null && searchParams[key] !== undefined) {
-        if (Array.isArray(searchParams[key])) {
-          searchParams[key].forEach(item => queryString.append(key, item));
-        } else {
-          queryString.append(key, searchParams[key]);
-        }
-      }
-    });
-    return apiRequest(`/drives/search?${queryString.toString()}`);
-  },
-
-  getSuggestions: async (query) => {
-    return await apiRequest(`/drives/suggestions?q=${encodeURIComponent(query)}`);
-  },
-
-  getFilterOptions: async () => {
-    return await apiRequest('/drives/filters');
-  },
-
-  create: async (jobData) => {
-    return await apiRequest('/drives/add', {
-      method: 'POST',
-      body: JSON.stringify(jobData),
-    });
-  },
-
-  getByAdmin: async (adminEmail) => {
-    return await apiRequest(`/drives/${adminEmail}`);
-  },
-};
+export const jobsAPI = drivesAPI;
 
 export const profileAPI = {
   get: async (userId) => {
+    return await apiRequest(`/profile/${userId}`);
+  },
+  getProfile: async (userId) => {
     return await apiRequest(`/profile/${userId}`);
   },
 
@@ -272,6 +243,43 @@ export const profileAPI = {
         body: JSON.stringify(profileData),
       });
     }
+  },
+  updateProfile: async (userId, profileData) => {
+    return await profileAPI.update(userId, profileData);
+  },
+};
+
+export const applicationAPI = {
+  getMyApplications: async (filters = {}) => {
+    return await studentAPI.getApplications(filters);
+  },
+  getApplication: async (id) => {
+    return await studentAPI.getApplication(id);
+  },
+  createApplication: async (jobId, applicationData = {}) => {
+    return await studentAPI.createApplication(jobId, applicationData);
+  },
+  applyForDrive: async (driveId, applicationData = {}) => {
+    return await studentAPI.createApplication(driveId, applicationData);
+  },
+  updateOfferStatus: async (applicationId, { action, note } = {}) => {
+    return await studentAPI.respondToOffer(applicationId, action, note);
+  },
+};
+
+export const notificationAPI = {
+  getNotifications: async () => {
+    const res = await apiRequest('/notifications');
+    return res.data?.notifications || res.data || res;
+  },
+  markAsRead: async (id) => {
+    return await apiRequest(`/notifications/${id}/read`, { method: 'PUT' });
+  },
+  markAllAsRead: async () => {
+    return await apiRequest('/notifications/read-all', { method: 'PUT' });
+  },
+  deleteNotification: async (id) => {
+    return await apiRequest(`/notifications/${id}`, { method: 'DELETE' });
   },
 };
 

@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { getUser, authAPI } from '../utils/api';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import PublicLayout from './ui/Layout/PublicLayout';
+import { Button } from './ui';
+import { ArrowRight, CheckCircle2, Briefcase, GraduationCap, Building2 } from 'lucide-react';
 import '../style.css';
 
 const initialCoordinators = [
@@ -11,126 +14,211 @@ const initialCoordinators = [
   { dept: 'MBA', name: 'Dr. Sneha', phone: '9876598765', cabin: 'B-505' },
   { dept: 'AIML & AIDS', name: 'Dr. Krishna', phone: '9876597654', cabin: 'A-206' },
 ];
+
 const Home = () => {
-  const [user, setUser] = useState(null);
-  const [coordinators, setCoordinators] = useState(initialCoordinators);
-    const [coordForm, setCoordForm] = useState({ dept: '', name: '', phone: '', cabin: '' });
-  const [showCoordForm, setShowCoordForm] = useState(false); // 🔄 Toggle for Coordinator Form
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
-  // Initialize user on component mount
-  React.useEffect(() => {
-    const currentUser = getUser();
-    if (currentUser) setUser(currentUser);
-  }, []);
-
-  const handleCoordChange = (e) => {
-    setCoordForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
-  const handleCoordSubmit = (e) => {
-    e.preventDefault();
-    setCoordinators(prev => [...prev, coordForm]);
-    setCoordForm({ dept: '', name: '', phone: '', cabin: '' });
-    alert('Coordinator added!');
-  };
-
-
-  const handleLogout = async () => {
-    try {
-      await authAPI.logout();
-      setUser(null);
-      window.location.href = '/login';
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Still clear local data even if API call fails
-      setUser(null);
-      window.location.href = '/login';
+  const handleDashboardRedirect = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    } else if (user?.role === 'admin') {
+      navigate('/admin/dashboard');
+    } else {
+      navigate('/student/dashboard');
     }
   };
 
   return (
-    <div className="homepage">
-      {/* Navbar */}
-      <nav className="navbar">
-        <div className="navbar-title">🎓 Campus Job Board</div>
-        <ul className="navbar-links">
-          <li><Link to="/">Home</Link></li>
-          <li><Link to="/jobs">Jobs</Link></li>
-          {user && user.role === 'student' && (
-            <li><Link to="/profile">My Profile</Link></li>
-          )}
-          {user ? (
-            <li>
-              <button onClick={handleLogout} className="logout-btn">
-                Logout ({user.name})
+    <PublicLayout>
+      {/* Hero Section with Deep Navy Background */}
+      <section style={{
+        background: 'var(--navy-deep)',
+        color: '#ffffff',
+        padding: '80px 32px',
+        borderBottom: '1px solid var(--border)'
+      }}>
+        <div style={{
+          maxWidth: '1240px',
+          margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '48px',
+          alignItems: 'center'
+        }}>
+          <div>
+            <div style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              color: 'var(--gold)',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              marginBottom: '16px'
+            }}>
+              INSTITUTIONAL PLACEMENT PORTAL
+            </div>
+
+            <h1 style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: '44px',
+              fontWeight: '700',
+              color: '#ffffff',
+              lineHeight: 1.15,
+              marginBottom: '20px'
+            }}>
+              Your placement season, organized like it should be.
+            </h1>
+
+            <p style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: '16px',
+              color: 'var(--faint)',
+              lineHeight: 1.6,
+              marginBottom: '32px',
+              maxWidth: '580px'
+            }}>
+              Centralized placement cell management for students and placement cell administrators. Real-time eligibility evaluation, verified student credentials, and 10-stage application tracking.
+            </p>
+
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <button
+                className="btn-gold"
+                style={{ height: '48px', padding: '0 28px', fontSize: '15px' }}
+                onClick={() => navigate('/placement-drives')}
+              >
+                <span>Explore Drives</span>
+                <ArrowRight size={16} />
               </button>
-            </li>
-          ) : (
-            <>
-              <li><Link to="/login">Login</Link></li>
-              <li><Link to="/signup">Signup</Link></li>
-            </>
-          )}
-        </ul>
-      </nav>
-
-      <section className="placement-heading">
-        <h2>📌 Placements</h2>
-        {user && <p className="greeting">👋 Welcome, <strong>{user.name}</strong>!</p>}
-        <h3>👨‍💼 Department-wise Placement Coordinators</h3>
-      </section>
-
-      <section className="coordinator-cards-container">
-        {coordinators.map((coordinator, index) => (
-          <div className="coordinator-card" key={index}>
-            <h4>{coordinator.dept}</h4>
-            <p><strong>Coordinator:</strong> {coordinator.name}</p>
-            <p><strong>Phone:</strong> {coordinator.phone}</p>
-            <p><strong>Cabin:</strong> {coordinator.cabin}</p>
+              <button
+                className="btn-secondary"
+                style={{
+                  height: '48px',
+                  padding: '0 28px',
+                  fontSize: '15px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  color: '#ffffff',
+                  borderColor: 'rgba(255, 255, 255, 0.25)'
+                }}
+                onClick={handleDashboardRedirect}
+              >
+                {isAuthenticated ? 'Go to Dashboard' : 'Build My Profile'}
+              </button>
+            </div>
           </div>
-        ))}
-      </section>
 
-      {user?.role === 'admin' && (
-        <div style={{ textAlign: 'right', marginTop: '20px', paddingRight: '20px' }}>
-          <button
-            className="add-job-btn"
-            onClick={() => setShowCoordForm(!showCoordForm)}
-          >
-            {showCoordForm ? '⬅ Close Coordinator Form' : '➕ Add Coordinator'}
-          </button>
+          {/* Right Statistics & Metrics Box */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '12px',
+            padding: '32px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '16px' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--gold)', textTransform: 'uppercase' }}>
+                CURRENT BATCH METRICS
+              </div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '38px', fontWeight: '700', color: '#ffffff', marginTop: '4px' }}>
+                12,000+
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--faint)' }}>Registered Engineering & Management Students</div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-serif)', fontSize: '28px', fontWeight: '700', color: '#ffffff' }}>150+</div>
+                <div style={{ fontSize: '12px', color: 'var(--faint)' }}>Verified Recruiting Companies</div>
+              </div>
+              <div>
+                <div style={{ fontFamily: 'var(--font-serif)', fontSize: '28px', fontWeight: '700', color: '#ffffff' }}>96%</div>
+                <div style={{ fontSize: '12px', color: 'var(--faint)' }}>Verified Profile Rate</div>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
-
-      {user?.role === 'admin' && showCoordForm && (
-        <section id="coordinator-form" className="admin-panel form-container">
-          <h2>➕ Add Placement Coordinator</h2>
-          <form className="form" onSubmit={handleCoordSubmit}>
-            <label>Department:</label>
-            <input name="dept" value={coordForm.dept} onChange={handleCoordChange} required />
-            <label>Name:</label>
-            <input name="name" value={coordForm.name} onChange={handleCoordChange} required />
-            <label>Phone:</label>
-            <input name="phone" value={coordForm.phone} onChange={handleCoordChange} required />
-            <label>Cabin:</label>
-            <input name="cabin" value={coordForm.cabin} onChange={handleCoordChange} required />
-            <button type="submit">Add Coordinator</button>
-          </form>
-        </section>
-      )}
-
-      <section className="cta-section">
-        <h3>🔍 Looking for Job Opportunities?</h3>
-        <p>Browse through our latest job postings and find your perfect match!</p>
-        <Link to="/jobs" className="cta-button">
-          View All Jobs →
-        </Link>
       </section>
 
-      <footer className="footer">
-        <p>&copy; 2025 Campus Job Board. All rights reserved.</p>
-      </footer>
-    </div>
+      {/* 4-Stage Placement Journey */}
+      <section style={{ padding: '64px 32px', maxWidth: '1240px', margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--gold-deep)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            SYSTEMATIC RECRUITMENT FLOW
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '32px', color: 'var(--navy-deep)', marginTop: '6px' }}>
+            Your 4-Stage Placement Journey
+          </h2>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
+          <div className="panel-card" style={{ marginBottom: 0 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--gold-deep)', fontWeight: '700', marginBottom: '8px' }}>
+              01 DISCOVER
+            </div>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', marginBottom: '8px' }}>Placement Drives</h3>
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: '14px', color: 'var(--text-secondary)' }}>
+              Browse active recruitment drives from verified hiring partners with transparent CTC packages and deadlines.
+            </p>
+          </div>
+
+          <div className="panel-card" style={{ marginBottom: 0 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--gold-deep)', fontWeight: '700', marginBottom: '8px' }}>
+              02 ELIGIBILITY
+            </div>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', marginBottom: '8px' }}>Rule Evaluation</h3>
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: '14px', color: 'var(--text-secondary)' }}>
+              Backend rules check CGPA cutoffs, backlog limits, department match, and graduation year automatically.
+            </p>
+          </div>
+
+          <div className="panel-card" style={{ marginBottom: 0 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--gold-deep)', fontWeight: '700', marginBottom: '8px' }}>
+              03 OPT-IN & APPLY
+            </div>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', marginBottom: '8px' }}>Formal Preference</h3>
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: '14px', color: 'var(--text-secondary)' }}>
+              Express explicit opt-in preferences and submit your verified student resume directly to the Placement Cell.
+            </p>
+          </div>
+
+          <div className="panel-card" style={{ marginBottom: 0 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--gold-deep)', fontWeight: '700', marginBottom: '8px' }}>
+              04 SELECTION
+            </div>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '18px', color: 'var(--navy-deep)', marginBottom: '8px' }}>Get Selected</h3>
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: '14px', color: 'var(--text-secondary)' }}>
+              Follow test schedules, technical/HR interview rounds, shortlisted announcements, and formal offer letters.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Department Placement Coordinators */}
+      <section style={{ padding: '0 32px 64px 32px', maxWidth: '1240px', margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '28px', color: 'var(--navy-deep)' }}>
+            Department Placement Coordinators
+          </h2>
+          <p style={{ fontFamily: 'var(--font-sans)', color: 'var(--text-secondary)', fontSize: '14px', marginTop: '4px' }}>
+            Contact your department coordinator for academic profile verification or drive queries.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+          {initialCoordinators.map((coord, idx) => (
+            <div className="panel-card" key={idx} style={{ marginBottom: 0, padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span className="badge badge-navy">{coord.dept}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Cabin {coord.cabin}</span>
+              </div>
+              <h4 style={{ fontFamily: 'var(--font-serif)', fontSize: '16px', color: 'var(--navy-deep)', marginBottom: '4px' }}>{coord.name}</h4>
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: '13px', color: 'var(--text-secondary)' }}>Cabin Contact: {coord.phone}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </PublicLayout>
   );
 };
 

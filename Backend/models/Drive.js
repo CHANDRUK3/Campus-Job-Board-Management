@@ -72,7 +72,7 @@ const driveSchema = new mongoose.Schema({
     required: true 
   }
 }, { 
-  timestamps: true 
+  timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true }
 });
 
 // Virtual for days until registration deadline
@@ -88,5 +88,10 @@ driveSchema.virtual('daysUntilDeadline').get(function() {
 driveSchema.methods.isAcceptingApplications = function() {
   return this.status === 'active' && new Date() < this.importantDates.registrationDeadline;
 };
+
+driveSchema.index({ status: 1 });
+driveSchema.index({ companyId: 1 });
+driveSchema.index({ 'importantDates.registrationDeadline': 1 });
+driveSchema.index({ createdBy: 1 });
 
 module.exports = mongoose.model('Drive', driveSchema);

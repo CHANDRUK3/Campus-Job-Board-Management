@@ -8,9 +8,10 @@ const Company = require('../models/company'); // Import Company model
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
+const { authenticate, authorize } = require('../middleware/auth');
 
 // POST: Student opts in or out
-router.post('/set', async (req, res) => {
+router.post('/set', authenticate, async (req, res) => {
   const { studentEmail, jobId, status } = req.body;
 
   // Validation
@@ -61,7 +62,7 @@ router.post('/set', async (req, res) => {
 });
 
 // GET: Admin gets all opt-in/out for a job
-router.get('/job/:jobId', async (req, res) => {
+router.get('/job/:jobId', authenticate, authorize('admin'), async (req, res) => {
   try {
     const statuses = await OptStatus.find({ jobId: req.params.jobId });
     res.json(statuses);
@@ -71,7 +72,7 @@ router.get('/job/:jobId', async (req, res) => {
   }
 });
 // GET: Student gets all their opt-in/out statuses
-router.get('/student/:studentEmail', async (req, res) => {
+router.get('/student/:studentEmail', authenticate, async (req, res) => {
   try {
     const statuses = await OptStatus.find({ studentEmail: req.params.studentEmail });
     res.json(statuses);
@@ -82,11 +83,11 @@ router.get('/student/:studentEmail', async (req, res) => {
 });
 
 // GET: Export all opt-in/opt-out data to Excel (Admin only)
-router.get('/export/excel', async (req, res) => {
+router.get('/export/excel', authenticate, authorize('admin'), async (req, res) => {
   try {
     // Get all opt-in/opt-out data with populated job and student information
     const optStatuses = await OptStatus.find()
-      .populate('jobId', 'company jobTitle location salary jobType experienceLevel applicationDeadline')
+      .populate('jobId', 'role package companyId location skills importantDates status')
       .sort({ timestamp: -1 });
 
     // Create a new workbook

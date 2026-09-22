@@ -67,4 +67,9 @@ const studentProfileSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+studentProfileSchema.index({ profileStatus: 1 });
+studentProfileSchema.index({ department: 1 });
+studentProfileSchema.index({ cgpa: 1 });
+studentProfileSchema.index({ gradYear: 1 });
+
 module.exports = mongoose.model('StudentProfile', studentProfileSchema);

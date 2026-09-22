@@ -29,5 +29,8 @@
     "node-fetch": "^2.7.0",
     "nodemailer": "^7.0.6",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }

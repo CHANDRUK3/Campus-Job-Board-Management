@@ -36,8 +36,8 @@ const validateUserRegistration = [
   
   body('role')
     .optional()
-    .isIn(['student', 'admin', 'recruiter'])
-    .withMessage('Role must be either student, admin, or recruiter'),
+    .isIn(['student', 'admin'])
+    .withMessage('Role must be either student or admin'),
   
   handleValidationErrors
 ];
@@ -58,15 +58,17 @@ const validateUserLogin = [
 
 // Job posting validation
 const validateJobPosting = [
-  body('company')
+  body('role')
     .trim()
     .isLength({ min: 2, max: 100 })
-    .withMessage('Company name must be between 2 and 100 characters'),
+    .withMessage('Role must be between 2 and 100 characters'),
   
-  body('jobTitle')
-    .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Job title must be between 2 and 100 characters'),
+  body('package')
+    .custom((value) => {
+      const numValue = parseFloat(value);
+      return !isNaN(numValue) && numValue > 0;
+    })
+    .withMessage('Package must be a valid number greater than 0'),
   
   body('description')
     .trim()
@@ -85,50 +87,27 @@ const validateJobPosting = [
     })
     .withMessage('At least one skill is required'),
   
-  body('salary.min')
-    .custom((value) => {
-      const numValue = parseFloat(value);
-      return !isNaN(numValue) && numValue > 0;
-    })
-    .withMessage('Minimum salary must be a valid number greater than 0'),
-  
-  body('salary.max')
-    .custom((value, { req }) => {
-      const numValue = parseFloat(value);
-      if (isNaN(numValue) || numValue <= 0) {
-        return false;
-      }
-      if (req.body.salary && req.body.salary.min) {
-        const minValue = parseFloat(req.body.salary.min);
-        return numValue >= minValue;
-      }
-      return true;
-    })
-    .withMessage('Maximum salary must be a valid number greater than or equal to minimum salary'),
-  
   body('location')
-    .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Location must be between 2 and 100 characters'),
-  
-  body('jobType')
-    .optional()
-    .isIn(['full-time', 'part-time', 'internship', 'contract'])
-    .withMessage('Invalid job type'),
-  
-  body('experienceLevel')
-    .optional()
-    .isIn(['fresher', '1-2 years', '3-5 years', '5+ years'])
-    .withMessage('Invalid experience level'),
+    .custom((value) => {
+      if (Array.isArray(value)) {
+        return value.length > 0;
+      }
+      if (typeof value === 'string') {
+        return value.trim().length > 0;
+      }
+      return false;
+    })
+    .withMessage('At least one location is required'),
   
   body('members')
+    .optional()
     .custom((value) => {
       const numValue = parseInt(value);
       return !isNaN(numValue) && numValue >= 1;
     })
     .withMessage('Number of members must be a positive integer'),
   
-  body('applicationDeadline')
+  body('importantDates.registrationDeadline')
     .isISO8601()
     .withMessage('Application deadline must be a valid date')
     .custom((value) => {
@@ -136,17 +115,7 @@ const validateJobPosting = [
       const now = new Date();
       return deadline > now;
     })
-    .withMessage('Application deadline must be in the future'),
-  
-  body('contactEmail')
-    .optional()
-    .isEmail()
-    .withMessage('Contact email must be a valid email address'),
-  
-  body('website')
-    .optional()
-    .isURL()
-    .withMessage('Website must be a valid URL'),
+    .withMessage('Registration deadline must be in the future'),
   
   handleValidationErrors
 ];

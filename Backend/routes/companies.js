@@ -31,7 +31,7 @@ router.get('/profiles/:companyId', async (req, res) => {
 });
 
 // POST: Create company profile (admin/recruiter)
-router.post('/profiles', authenticate, authorize('admin', 'recruiter'), async (req, res) => {
+router.post('/profiles', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { name, description, logo, website, industry, contactEmail } = req.body;
     if (!name?.trim()) return res.status(400).json({ message: 'Company name is required' });
@@ -56,7 +56,7 @@ router.post('/profiles', authenticate, authorize('admin', 'recruiter'), async (r
 });
 
 // PUT: Update company profile (admin/recruiter)
-router.put('/profiles/:companyId', authenticate, authorize('admin', 'recruiter'), async (req, res) => {
+router.put('/profiles/:companyId', authenticate, authorize('admin'), async (req, res) => {
   try {
     const company = await Company.findById(req.params.companyId);
     if (!company) return res.status(404).json({ message: 'Company not found' });

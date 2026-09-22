@@ -2,6 +2,7 @@ const XLSX = require('xlsx');
 const csv = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
+const Drive = require('../models/Drive');
 const Company = require('../models/company');
 const User = require('../models/user');
 const emailService = require('./emailService');
@@ -25,7 +26,7 @@ class BulkOperationsService {
       const validatedJobs = await this.validateAndProcessJobs(jobs, adminEmail);
       
       // Bulk insert jobs
-      const insertedJobs = await Company.insertMany(validatedJobs);
+      const insertedJobs = await Drive.insertMany(validatedJobs);
       
       // Send notifications to students
       await this.notifyStudentsAboutNewJobs(insertedJobs);
@@ -51,18 +52,15 @@ class BulkOperationsService {
     
     return data.map(row => ({
       company: row.Company || row.company,
-      jobTitle: row['Job Title'] || row.jobTitle || row['JobTitle'],
+      role: row.Role || row.role || row['Job Title'] || row.jobTitle,
       description: row.Description || row.description,
       skills: row.Skills || row.skills,
-      salaryMin: row['Salary Min'] || row.salaryMin || row['SalaryMin'],
-      salaryMax: row['Salary Max'] || row.salaryMax || row['SalaryMax'],
+      package: row.Package || row.package || row.Salary || row.salary,
       location: row.Location || row.location,
       jobType: row['Job Type'] || row.jobType || row['JobType'],
-      experienceLevel: row['Experience Level'] || row.experienceLevel || row['ExperienceLevel'],
+      workMode: row['Work Mode'] || row.workMode || row['WorkMode'],
       members: row.Members || row.members || row.Positions || row.positions,
-      applicationDeadline: row['Application Deadline'] || row.applicationDeadline || row['ApplicationDeadline'],
-      contactEmail: row['Contact Email'] || row.contactEmail || row['ContactEmail'],
-      website: row.Website || row.website
+      registrationDeadline: row['Registration Deadline'] || row.registrationDeadline || row['RegistrationDeadline'] || row['Application Deadline'],
     }));
   }
 
@@ -87,46 +85,56 @@ class BulkOperationsService {
       const job = jobs[i];
       try {
         // Validate required fields
-        if (!job.company || !job.jobTitle || !job.description) {
-          throw new Error(`Row ${i + 1}: Missing required fields (company, jobTitle, description)`);
+        if (!job.company || !job.role || !job.description || !job.package) {
+          throw new Error(`Row ${i + 1}: Missing required fields (company, role, description, package)`);
+        }
+
+        // Find or create company
+        let companyDoc = await Company.findOne({ name: { $regex: new RegExp(`^${job.company.trim()}$`, 'i') } });
+        if (!companyDoc) {
+          companyDoc = new Company({
+            name: job.company.trim(),
+            industry: 'Other',
+            description: 'Imported via bulk upload'
+          });
+          await companyDoc.save();
         }
 
         // Process skills
         const skills = Array.isArray(job.skills) ? job.skills : 
                       job.skills ? job.skills.split(',').map(s => s.trim()) : [];
 
-        // Process salary
-        const salaryMin = parseFloat(job.salaryMin) || 0;
-        const salaryMax = parseFloat(job.salaryMax) || salaryMin;
+        // Process locations
+        const locations = Array.isArray(job.location) ? job.location : 
+                      job.location ? job.location.split(',').map(s => s.trim()) : ['Not specified'];
+
+        // Process package
+        const packageCtc = parseFloat(job.package) || 0;
 
         // Process deadline
-        let applicationDeadline = new Date();
-        if (job.applicationDeadline) {
-          applicationDeadline = new Date(job.applicationDeadline);
-          if (isNaN(applicationDeadline.getTime())) {
-            applicationDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+        let registrationDeadline = new Date();
+        if (job.registrationDeadline) {
+          registrationDeadline = new Date(job.registrationDeadline);
+          if (isNaN(registrationDeadline.getTime())) {
+            registrationDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
           }
         } else {
-          applicationDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+          registrationDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
         }
 
         const validatedJob = {
-          company: job.company.trim(),
-          jobTitle: job.jobTitle.trim(),
+          companyId: companyDoc._id,
+          role: job.role.trim(),
           description: job.description.trim(),
           skills: skills,
-          salary: {
-            min: salaryMin,
-            max: salaryMax,
-            currency: 'INR'
-          },
-          location: job.location?.trim() || 'Not specified',
+          package: packageCtc,
+          location: locations,
           jobType: job.jobType?.trim() || 'full-time',
-          experienceLevel: job.experienceLevel?.trim() || 'fresher',
+          workMode: job.workMode?.trim() || 'onsite',
           members: parseInt(job.members) || 1,
-          applicationDeadline: applicationDeadline,
-          contactEmail: job.contactEmail?.trim(),
-          website: job.website?.trim(),
+          importantDates: {
+            registrationDeadline: registrationDeadline
+          },
           status: 'active',
           createdBy: adminEmail
         };
@@ -161,24 +169,21 @@ class BulkOperationsService {
   static async exportJobsToExcel(adminEmail, filters = {}) {
     try {
       const query = { createdBy: adminEmail, ...filters };
-      const jobs = await Company.find(query).lean();
+      const drives = await Drive.find(query).populate('companyId', 'name').lean();
 
-      const exportData = jobs.map(job => ({
-        'Company': job.company,
-        'Job Title': job.jobTitle,
-        'Description': job.description,
-        'Skills': Array.isArray(job.skills) ? job.skills.join(', ') : job.skills,
-        'Salary Min': job.salary?.min || 0,
-        'Salary Max': job.salary?.max || 0,
-        'Location': job.location,
-        'Job Type': job.jobType,
-        'Experience Level': job.experienceLevel,
-        'Positions': job.members,
-        'Application Deadline': new Date(job.applicationDeadline).toLocaleDateString(),
-        'Status': job.status,
-        'Contact Email': job.contactEmail || '',
-        'Website': job.website || '',
-        'Created At': new Date(job.createdAt).toLocaleDateString()
+      const exportData = drives.map(drive => ({
+        'Company': drive.companyId?.name || 'Unknown',
+        'Role': drive.role,
+        'Description': drive.description,
+        'Skills': Array.isArray(drive.skills) ? drive.skills.join(', ') : drive.skills,
+        'Package': drive.package || 0,
+        'Location': Array.isArray(drive.location) ? drive.location.join(', ') : drive.location,
+        'Job Type': drive.jobType,
+        'Work Mode': drive.workMode,
+        'Positions': drive.members,
+        'Registration Deadline': drive.importantDates?.registrationDeadline ? new Date(drive.importantDates.registrationDeadline).toLocaleDateString() : '',
+        'Status': drive.status,
+        'Created At': new Date(drive.createdAt).toLocaleDateString()
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -272,7 +277,7 @@ class BulkOperationsService {
   // Bulk update job status
   static async bulkUpdateJobStatus(jobIds, status, adminEmail) {
     try {
-      const result = await Company.updateMany(
+      const result = await Drive.updateMany(
         { 
           _id: { $in: jobIds },
           createdBy: adminEmail // Ensure admin can only update their own jobs
@@ -293,7 +298,7 @@ class BulkOperationsService {
   // Bulk delete jobs
   static async bulkDeleteJobs(jobIds, adminEmail) {
     try {
-      const result = await Company.deleteMany({
+      const result = await Drive.deleteMany({
         _id: { $in: jobIds },
         createdBy: adminEmail // Ensure admin can only delete their own jobs
       });
@@ -313,18 +318,15 @@ class BulkOperationsService {
     const templateData = [
       {
         'Company': 'Example Company',
-        'Job Title': 'Software Developer',
+        'Role': 'Software Developer',
         'Description': 'We are looking for a skilled software developer...',
         'Skills': 'JavaScript, React, Node.js',
-        'Salary Min': 5,
-        'Salary Max': 8,
-        'Location': 'Bangalore',
+        'Package': 8,
+        'Location': 'Bangalore, Mumbai',
         'Job Type': 'full-time',
-        'Experience Level': 'fresher',
+        'Work Mode': 'hybrid',
         'Members': 2,
-        'Application Deadline': '2024-12-31',
-        'Contact Email': 'hr@example.com',
-        'Website': 'https://example.com'
+        'Registration Deadline': '2024-12-31'
       }
     ];
 

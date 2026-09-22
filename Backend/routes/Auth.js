@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
-const bcrypt = require('bcryptjs');
 const { generateTokenPair, verifyRefreshToken } = require('../utils/jwt');
 const { authenticate } = require('../middleware/auth');
 const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
@@ -18,8 +17,7 @@ router.post('/register', validateUserRegistration, async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const newUser = new User({ name, email, password: hashedPassword, role });
+    const newUser = new User({ name, email, password, role });
     await newUser.save();
 
     // Generate tokens
@@ -64,7 +62,7 @@ router.post('/login', validateUserLogin, async (req, res) => {
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
       return res.status(401).json({ 
         message: 'Invalid email or password',

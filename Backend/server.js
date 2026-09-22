@@ -22,6 +22,7 @@ const notificationsRoutes = require('./routes/notifications');
 const studentProfileRoutes = require('./routes/studentProfileRoutes');
 const adminRoutes = require('./routes/admin');
 const studentRoutes = require('./routes/student');
+const { startDeadlineReminderJob } = require('./jobs/deadlineReminderJob');
 
 const app = express();
 
@@ -71,10 +72,7 @@ app.use(fileUpload({
 }));
 
 // MongoDB Connection
-mongoose.connect('mongodb://localhost:27017/jobboard', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+mongoose.connect('mongodb://localhost:27017/jobboard')
   .then(() => console.log('✅ MongoDB connected'))
   .catch((err) => console.error('❌ MongoDB connection error:', err));
 
@@ -94,8 +92,6 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/drives', driveRoutes);
-// Legacy: frontend still uses /api/companies for drive operations
-app.use('/api/companies', driveRoutes);
 app.use('/api/optstatus', optStatusRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/profile', studentProfileRoutes);
@@ -103,5 +99,12 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/student', studentRoutes);
 
 // Start Server
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
+// Start background jobs
+try {
+  startDeadlineReminderJob(10); // every 10 minutes
+} catch (err) {
+  console.error('Failed to start deadline reminder job:', err.message || err);
+}

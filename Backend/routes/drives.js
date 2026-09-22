@@ -90,7 +90,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST: Add a new drive (admin/recruiter only)
-router.post('/add', authenticate, authorize('admin', 'recruiter'), async (req, res) => {
+router.post('/add', authenticate, authorize('admin'), async (req, res) => {
   try {
     const {
       company,
@@ -192,7 +192,7 @@ router.post('/add', authenticate, authorize('admin', 'recruiter'), async (req, r
   }
 });
 
-router.get('/:adminEmail', authenticate, authorize('admin', 'recruiter'), async (req, res) => {
+router.get('/:adminEmail', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { adminEmail } = req.params;
     if (req.user.email !== adminEmail) {
@@ -207,7 +207,7 @@ router.get('/:adminEmail', authenticate, authorize('admin', 'recruiter'), async 
   }
 });
 
-router.put('/:jobId/status', authenticate, authorize('admin', 'recruiter'), async (req, res) => {
+router.put('/:jobId/status', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { jobId } = req.params;
     const { status } = req.body;
@@ -232,7 +232,7 @@ router.put('/:jobId/status', authenticate, authorize('admin', 'recruiter'), asyn
   }
 });
 
-router.delete('/:jobId', authenticate, authorize('admin', 'recruiter'), async (req, res) => {
+router.delete('/:jobId', authenticate, authorize('admin'), async (req, res) => {
   try {
     const drive = await Drive.findById(req.params.jobId);
     if (!drive) return res.status(404).json({ message: 'Drive not found' });

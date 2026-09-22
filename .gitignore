@@ -1,2 +1,26 @@
 
+# Node / package managers
+node_modules/
+**/node_modules/
+
+# Build outputs
 .next/
+dist/
+build/
+
+# Local env files
+.env
+.env.*
+
+# OS / editor junk
+.DS_Store
+.vscode/
+
+# Logs
+*.log
+
+# Upload artifacts (if not meant to be versioned)
+Backend/uploads/exports/
+Backend/uploads/imports/
+Backend/uploads/resumes/
+Backend/uploads/templates/

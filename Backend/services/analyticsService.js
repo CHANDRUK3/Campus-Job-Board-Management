@@ -1,6 +1,7 @@
+const Drive = require('../models/Drive');
 const Company = require('../models/company');
 const User = require('../models/user');
-const OptStatus = require('../models/OptStatus');
+const Application = require('../models/Application');
 const Notification = require('../models/Notification');
 
 class AnalyticsService {
@@ -39,19 +40,19 @@ class AnalyticsService {
 
   // Job statistics
   static async getJobStatistics(adminEmail) {
-    const totalJobs = await Company.countDocuments();
-    const activeJobs = await Company.countDocuments({ status: 'active' });
-    const closedJobs = await Company.countDocuments({ status: 'closed' });
-    const draftJobs = await Company.countDocuments({ status: 'draft' });
+    const totalJobs = await Drive.countDocuments();
+    const activeJobs = await Drive.countDocuments({ status: 'active' });
+    const closedJobs = await Drive.countDocuments({ status: 'closed' });
+    const draftJobs = await Drive.countDocuments({ status: 'draft' });
     
     // Jobs by admin
-    const adminJobs = await Company.countDocuments({ createdBy: adminEmail });
+    const adminJobs = await Drive.countDocuments({ createdBy: adminEmail });
     
     // Jobs by month (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
-    const jobsByMonth = await Company.aggregate([
+    const jobsByMonth = await Drive.aggregate([
       {
         $match: {
           createdAt: { $gte: sixMonthsAgo }
@@ -86,48 +87,59 @@ class AnalyticsService {
 
   // Application statistics
   static async getApplicationStatistics() {
-    const totalApplications = await OptStatus.countDocuments();
-    const optInCount = await OptStatus.countDocuments({ status: 'opt-in' });
-    const optOutCount = await OptStatus.countDocuments({ status: 'opt-out' });
+    const totalApplications = await Application.countDocuments();
+    const selectedCount = await Application.countDocuments({ status: 'selected' });
+    const rejectedCount = await Application.countDocuments({ status: 'closed', 'outcome.result': 'not_selected' });
     
     // Applications by job
-    const applicationsByJob = await OptStatus.aggregate([
+    const applicationsByJob = await Application.aggregate([
       {
         $group: {
-          _id: '$jobId',
+          _id: '$drive',
           totalApplications: { $sum: 1 },
-          optInCount: {
-            $sum: { $cond: [{ $eq: ['$status', 'opt-in'] }, 1, 0] }
+          selectedCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'selected'] }, 1, 0] }
           }
         }
       },
       {
         $lookup: {
-          from: 'companies',
+          from: 'drives',
           localField: '_id',
           foreignField: '_id',
-          as: 'job'
+          as: 'driveInfo'
         }
       },
       {
-        $unwind: '$job'
+        $unwind: '$driveInfo'
+      },
+      {
+        $lookup: {
+          from: 'companies',
+          localField: 'driveInfo.companyId',
+          foreignField: '_id',
+          as: 'companyInfo'
+        }
+      },
+      {
+        $unwind: { path: '$companyInfo', preserveNullAndEmptyArrays: true }
       },
       {
         $project: {
-          jobTitle: '$job.jobTitle',
-          company: '$job.company',
+          jobTitle: '$driveInfo.role',
+          company: '$companyInfo.name',
           totalApplications: 1,
-          optInCount: 1,
+          selectedCount: 1,
           conversionRate: {
             $multiply: [
-              { $divide: ['$optInCount', '$totalApplications'] },
+              { $divide: ['$selectedCount', '$totalApplications'] },
               100
             ]
           }
         }
       },
       {
-        $sort: { optInCount: -1 }
+        $sort: { totalApplications: -1 }
       },
       {
         $limit: 10
@@ -138,21 +150,21 @@ class AnalyticsService {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
-    const applicationsByMonth = await OptStatus.aggregate([
+    const applicationsByMonth = await Application.aggregate([
       {
         $match: {
-          timestamp: { $gte: sixMonthsAgo }
+          applicationDate: { $gte: sixMonthsAgo }
         }
       },
       {
         $group: {
           _id: {
-            year: { $year: '$timestamp' },
-            month: { $month: '$timestamp' }
+            year: { $year: '$applicationDate' },
+            month: { $month: '$applicationDate' }
           },
           totalApplications: { $sum: 1 },
-          optInCount: {
-            $sum: { $cond: [{ $eq: ['$status', 'opt-in'] }, 1, 0] }
+          selectedCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'selected'] }, 1, 0] }
           }
         }
       },
@@ -163,14 +175,14 @@ class AnalyticsService {
 
     return {
       total: totalApplications,
-      optIn: optInCount,
-      optOut: optOutCount,
-      conversionRate: totalApplications > 0 ? (optInCount / totalApplications * 100).toFixed(2) : 0,
+      selected: selectedCount,
+      rejected: rejectedCount,
+      conversionRate: totalApplications > 0 ? (selectedCount / totalApplications * 100).toFixed(2) : 0,
       topJobs: applicationsByJob,
       applicationsByMonth: applicationsByMonth.map(item => ({
         month: `${item._id.year}-${item._id.month.toString().padStart(2, '0')}`,
         total: item.totalApplications,
-        optIn: item.optInCount
+        selected: item.selectedCount
       }))
     };
   }
@@ -184,16 +196,16 @@ class AnalyticsService {
     });
     
     // Students with applications
-    const studentsWithApplications = await OptStatus.distinct('studentEmail');
+    const studentsWithApplicationsResult = await Application.distinct('student');
     
     // Most active students
-    const mostActiveStudents = await OptStatus.aggregate([
+    const mostActiveStudents = await Application.aggregate([
       {
         $group: {
-          _id: '$studentEmail',
+          _id: '$student',
           totalApplications: { $sum: 1 },
-          optInCount: {
-            $sum: { $cond: [{ $eq: ['$status', 'opt-in'] }, 1, 0] }
+          selectedCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'selected'] }, 1, 0] }
           }
         }
       },
@@ -201,7 +213,7 @@ class AnalyticsService {
         $lookup: {
           from: 'users',
           localField: '_id',
-          foreignField: 'email',
+          foreignField: '_id',
           as: 'user'
         }
       },
@@ -213,7 +225,7 @@ class AnalyticsService {
           name: '$user.name',
           email: '$user.email',
           totalApplications: 1,
-          optInCount: 1
+          selectedCount: 1
         }
       },
       {
@@ -227,23 +239,47 @@ class AnalyticsService {
     return {
       total: totalStudents,
       active: activeStudents,
-      withApplications: studentsWithApplications.length,
+      withApplications: studentsWithApplicationsResult.length,
       mostActive: mostActiveStudents
     };
   }
 
   // Recent activity
   static async getRecentActivity() {
-    const recentJobs = await Company.find()
+    const recentJobs = await Drive.find()
       .sort({ createdAt: -1 })
       .limit(5)
-      .select('company jobTitle createdAt createdBy');
+      .populate('companyId', 'name')
+      .select('companyId role createdAt createdBy');
 
-    const recentApplications = await OptStatus.find()
-      .sort({ timestamp: -1 })
+    // format recent jobs
+    const formattedRecentJobs = recentJobs.map(job => ({
+      company: job.companyId ? job.companyId.name : 'Unknown',
+      jobTitle: job.role,
+      createdAt: job.createdAt,
+      createdBy: job.createdBy
+    }));
+
+    const recentApplications = await Application.find()
+      .sort({ applicationDate: -1 })
       .limit(10)
-      .populate('jobId', 'company jobTitle')
-      .select('studentEmail status timestamp jobId');
+      .populate({
+        path: 'drive',
+        populate: { path: 'companyId', select: 'name' }
+      })
+      .populate('student', 'email name')
+      .select('student status applicationDate drive');
+
+    // format recent apps
+    const formattedRecentApps = recentApplications.map(app => ({
+      studentEmail: app.student ? app.student.email : 'Unknown',
+      status: app.status,
+      timestamp: app.applicationDate,
+      job: {
+        company: app.drive?.companyId?.name || 'Unknown',
+        jobTitle: app.drive?.role || 'Unknown'
+      }
+    }));
 
     const recentNotifications = await Notification.find()
       .sort({ createdAt: -1 })
@@ -251,52 +287,63 @@ class AnalyticsService {
       .select('type message recipient createdAt');
 
     return {
-      recentJobs,
-      recentApplications,
+      recentJobs: formattedRecentJobs,
+      recentApplications: formattedRecentApps,
       recentNotifications
     };
   }
 
   // Top companies by applications
   static async getTopCompanies() {
-    const topCompanies = await OptStatus.aggregate([
+    const topCompanies = await Application.aggregate([
       {
         $lookup: {
-          from: 'companies',
-          localField: 'jobId',
+          from: 'drives',
+          localField: 'drive',
           foreignField: '_id',
-          as: 'job'
+          as: 'driveInfo'
         }
       },
       {
-        $unwind: '$job'
+        $unwind: '$driveInfo'
+      },
+      {
+        $lookup: {
+          from: 'companies',
+          localField: 'driveInfo.companyId',
+          foreignField: '_id',
+          as: 'company'
+        }
+      },
+      {
+        $unwind: '$company'
       },
       {
         $group: {
-          _id: '$job.company',
+          _id: '$company.name',
           totalApplications: { $sum: 1 },
-          optInCount: {
-            $sum: { $cond: [{ $eq: ['$status', 'opt-in'] }, 1, 0] }
+          selectedCount: {
+            $sum: { $cond: [{ $eq: ['$status', 'selected'] }, 1, 0] }
           },
-          jobCount: { $addToSet: '$jobId' }
+          jobCount: { $addToSet: '$drive' }
         }
       },
       {
         $project: {
           company: '$_id',
           totalApplications: 1,
-          optInCount: 1,
+          selectedCount: 1,
           jobCount: { $size: '$jobCount' },
           conversionRate: {
             $multiply: [
-              { $divide: ['$optInCount', '$totalApplications'] },
+              { $divide: ['$selectedCount', '$totalApplications'] },
               100
             ]
           }
         }
       },
       {
-        $sort: { optInCount: -1 }
+        $sort: { totalApplications: -1 }
       },
       {
         $limit: 10
@@ -312,7 +359,7 @@ class AnalyticsService {
     const startOfYear = new Date(currentYear, 0, 1);
     
     // Monthly trends for current year
-    const monthlyTrends = await Company.aggregate([
+    const monthlyTrends = await Drive.aggregate([
       {
         $match: {
           createdAt: { $gte: startOfYear }
@@ -331,18 +378,18 @@ class AnalyticsService {
     ]);
 
     // Application trends
-    const applicationTrends = await OptStatus.aggregate([
+    const applicationTrends = await Application.aggregate([
       {
         $match: {
-          timestamp: { $gte: startOfYear }
+          applicationDate: { $gte: startOfYear }
         }
       },
       {
         $group: {
-          _id: { $month: '$timestamp' },
+          _id: { $month: '$applicationDate' },
           totalApplications: { $sum: 1 },
-          optInApplications: {
-            $sum: { $cond: [{ $eq: ['$status', 'opt-in'] }, 1, 0] }
+          selectedApplications: {
+            $sum: { $cond: [{ $eq: ['$status', 'selected'] }, 1, 0] }
           }
         }
       },
@@ -360,7 +407,7 @@ class AnalyticsService {
       applicationTrends: applicationTrends.map(item => ({
         month: item._id,
         totalApplications: item.totalApplications,
-        optInApplications: item.optInApplications
+        selectedApplications: item.selectedApplications
       }))
     };
   }
@@ -368,13 +415,16 @@ class AnalyticsService {
   // Generate placement report
   static async generatePlacementReport(startDate, endDate) {
     try {
-      const jobs = await Company.find({
+      const jobs = await Drive.find({
         createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
-      });
+      }).populate('companyId', 'name');
 
-      const applications = await OptStatus.find({
-        timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) }
-      }).populate('jobId', 'company jobTitle');
+      const applications = await Application.find({
+        applicationDate: { $gte: new Date(startDate), $lte: new Date(endDate) }
+      }).populate({
+        path: 'drive',
+        populate: { path: 'companyId', select: 'name' }
+      }).populate('student', 'email name');
 
       const students = await User.find({ role: 'student' });
 
@@ -384,15 +434,15 @@ class AnalyticsService {
           totalJobs: jobs.length,
           totalApplications: applications.length,
           totalStudents: students.length,
-          optInRate: applications.length > 0 ? 
-            (applications.filter(app => app.status === 'opt-in').length / applications.length * 100).toFixed(2) : 0
+          selectedRate: applications.length > 0 ? 
+            (applications.filter(app => app.status === 'selected').length / applications.length * 100).toFixed(2) : 0
         },
         jobs,
         applications,
         students: students.map(student => ({
           name: student.name,
           email: student.email,
-          applicationsCount: applications.filter(app => app.studentEmail === student.email).length
+          applicationsCount: applications.filter(app => app.student && app.student.email === student.email).length
         }))
       };
     } catch (error) {

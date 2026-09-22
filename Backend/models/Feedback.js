@@ -182,7 +182,7 @@ const feedbackSchema = new mongoose.Schema({
     notes: String
   }]
 }, {
-  timestamps: true
+  timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true }
 });
 
 // Indexes
